@@ -1,6 +1,7 @@
 """RAG query orchestration."""
 
 from __future__ import annotations
+from venv import logger
 
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.llm.llm_service import LLMService
@@ -39,6 +40,12 @@ class RAGService:
             for result in search_results
             if result.score >= self._retrieval_min_score
         ]
+        # logger.info(
+        #     "RAG search found %d relevant results for question: %s. Results: %s",
+        #     len(relevant_results),
+        #     question,
+        #     relevant_results,
+        # )
         if not relevant_results:
             return {
                 "answer": FALLBACK_RESPONSE,

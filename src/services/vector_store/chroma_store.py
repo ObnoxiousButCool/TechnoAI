@@ -15,9 +15,7 @@ class ChromaStore(VectorStore):
     """ChromaDB implementation of VectorStore."""
 
     def __init__(self, collection_name: str = "techno_ai") -> None:
-        self.client = chromadb.Client(
-            Settings(persist_directory="./chroma_db")
-        )
+        self.client = chromadb.PersistentClient(path="./chroma_db")
         self.collection = self.client.get_or_create_collection(
             name=collection_name
         )
