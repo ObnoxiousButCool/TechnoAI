@@ -9,7 +9,14 @@ disabled unless explicitly configured.
 
 1. Copy `.env.example` to `.env` and fill in `OPENAI_API_KEY` and `WEBSITE_URL`.
    Optionally set `WEBSITE_URLS` to a comma-separated list of fallback pages.
-2. Start the stack:
+2. Install Python dependencies and Playwright browser binaries:
+
+   ```bash
+   pip install -r requirements.txt
+   playwright install
+   ```
+
+3. Start the stack:
 
    ```bash
    docker compose up --build

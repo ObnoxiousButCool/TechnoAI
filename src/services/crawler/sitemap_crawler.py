@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree
+from typing import Optional
 
 import requests
 
@@ -12,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class SitemapCrawler:
-    """Fetch URLs from sitemap.xml and download page HTML."""
+    """Fetch URLs from sitemap.xml and render page HTML via Playwright."""
 
     def __init__(
         self,
@@ -26,6 +27,8 @@ class SitemapCrawler:
         self._timeout = timeout
         self._session = requests.Session()
         self._session.headers.update({"User-Agent": user_agent})
+        self._playwright: Optional[object] = None
+        self._browser: Optional[object] = None
 
     def discover_urls(self) -> list[str]:
         """Resolve URLs from a sitemap or sitemap index."""
@@ -51,11 +54,52 @@ class SitemapCrawler:
         )
 
     def fetch_page(self, url: str) -> str:
-        """Download raw HTML for a page."""
+        """Render a page with Playwright and return the full HTML."""
 
-        response = self._session.get(url, timeout=self._timeout)
-        response.raise_for_status()
-        return response.text
+        from playwright.sync_api import (  # noqa: PLC0415
+            TimeoutError as PlaywrightTimeoutError,
+            sync_playwright,
+        )
+
+        if self._playwright is None:
+            self._playwright = sync_playwright().start()
+            self._browser = self._playwright.chromium.launch(headless=True)
+
+        page = self._browser.new_page()
+        try:
+            page.goto(
+                url,
+                timeout=self._timeout * 1000,
+                wait_until="networkidle",
+            )
+            html = page.content()
+            LOGGER.info("Rendered page at %s: %d chars", url, len(html))
+            return html
+        except PlaywrightTimeoutError:
+            LOGGER.warning(
+                "Playwright timed out after %ds for %s; retrying with domcontentloaded",
+                self._timeout,
+                url,
+            )
+            page.goto(url, timeout=self._timeout * 1000, wait_until="domcontentloaded")
+            html = page.content()
+            LOGGER.info("Rendered page at %s: %d chars (fallback)", url, len(html))
+            return html
+        finally:
+            page.close()
+
+    def close(self) -> None:
+        """Release Playwright browser resources."""
+
+        if self._browser is not None:
+            self._browser.close()
+            self._browser = None
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
+
+    def __del__(self) -> None:
+        self.close()
 
     def _discover_sitemap_urls(self) -> list[str]:
         sitemap_url = urljoin(f"{self._base_url}/", "sitemap.xml")

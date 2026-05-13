@@ -65,6 +65,9 @@ class WebsiteIngestor:
             try:
                 html = self._crawler.fetch_page(url)
                 cleaned_text = clean_html(html)
+                LOGGER.info(
+                    "Cleaned text at %s: %d chars", url, len(cleaned_text)
+                )
                 if not cleaned_text:
                     continue
 
@@ -100,6 +103,7 @@ class WebsiteIngestor:
             except Exception:
                 LOGGER.exception("Failed to ingest page: %s", url)
 
+        self._crawler.close()
         return IngestionResult(
             source_name=self.source_name,
             processed_items=len(urls),
