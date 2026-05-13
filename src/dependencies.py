@@ -55,6 +55,7 @@ def get_ingestion_pipeline() -> IngestionPipeline:
         base_url=settings.website_url,
         user_agent=settings.user_agent,
         timeout=settings.request_timeout_seconds,
+        manual_urls=settings.website_urls,
     )
     sources = [
         WebsiteIngestor(

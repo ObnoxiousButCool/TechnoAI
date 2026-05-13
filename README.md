@@ -8,6 +8,7 @@ disabled unless explicitly configured.
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in `OPENAI_API_KEY` and `WEBSITE_URL`.
+   Optionally set `WEBSITE_URLS` to a comma-separated list of fallback pages.
 2. Start the stack:
 
    ```bash
@@ -48,4 +49,7 @@ disabled unless explicitly configured.
 
 - PostgreSQL uses the `pgvector` extension for similarity search.
 - The vector store is abstracted behind `VectorStore` for future providers.
+- Website ingestion tries `WEBSITE_URL/sitemap.xml` first. If the sitemap is
+  missing, invalid, HTML, empty, or cannot be parsed, it falls back to
+  `WEBSITE_URLS`; relative paths are resolved against `WEBSITE_URL`.
 - The scheduler is a placeholder for future cron-based ingestion jobs.

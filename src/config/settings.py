@@ -39,6 +39,7 @@ class Settings(BaseSettings):
         alias="ENABLE_FILE_INGEST",
     )
     website_url: str = Field(default="", alias="WEBSITE_URL")
+    website_urls: str = Field(default="", alias="WEBSITE_URLS")
     pdf_directory: str = Field(default="./data/pdfs", alias="PDF_DIRECTORY")
     chunk_size_words: int = Field(default=700, alias="CHUNK_SIZE_WORDS")
     chunk_overlap_words: int = Field(default=100, alias="CHUNK_OVERLAP_WORDS")
