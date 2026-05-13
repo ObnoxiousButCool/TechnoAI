@@ -145,3 +145,14 @@ class PGVectorStore(VectorStore):
                     (namespace,),
                 )
             connection.commit()
+
+    def clear(self) -> int:
+        """Delete every vector from PostgreSQL."""
+
+        with self._connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM document_chunks;")
+                deleted_count = cursor.rowcount
+            connection.commit()
+
+        return deleted_count

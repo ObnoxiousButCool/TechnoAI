@@ -4,7 +4,6 @@ import logging
 from typing import List
 
 import chromadb
-from chromadb.config import Settings
 
 from src.services.vector_store.base import SearchResult, VectorRecord, VectorStore
 
@@ -15,9 +14,10 @@ class ChromaStore(VectorStore):
     """ChromaDB implementation of VectorStore."""
 
     def __init__(self, collection_name: str = "techno_ai") -> None:
+        self.collection_name = collection_name
         self.client = chromadb.PersistentClient(path="./chroma_db")
         self.collection = self.client.get_or_create_collection(
-            name=collection_name
+            name=self.collection_name
         )
 
     def initialize(self, vector_size: int) -> None:
@@ -91,3 +91,13 @@ class ChromaStore(VectorStore):
 
         if ids:
             self.collection.delete(ids=ids)
+
+    def clear(self) -> int:
+        """Delete all vectors in the Chroma collection."""
+
+        deleted_count = self.collection.count()
+        self.client.delete_collection(name=self.collection_name)
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name
+        )
+        return deleted_count

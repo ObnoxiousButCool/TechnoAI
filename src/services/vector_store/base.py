@@ -41,3 +41,7 @@ class VectorStore(ABC):
     @abstractmethod
     def delete(self, namespace: str) -> None:
         """Delete vectors associated with a namespace."""
+
+    @abstractmethod
+    def clear(self) -> int:
+        """Delete every vector from the store and return the deleted count."""

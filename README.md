@@ -25,6 +25,13 @@ disabled unless explicitly configured.
   curl -X POST http://localhost:8000/ingest/run
   ```
 
+- `DELETE /ingest/vectors`
+  Clears all previously ingested ChromaDB vector contents.
+
+  ```bash
+  curl -X DELETE http://localhost:8000/ingest/vectors
+  ```
+
 - `POST /chat`
   Answers a question using only retrieved website content.
 
