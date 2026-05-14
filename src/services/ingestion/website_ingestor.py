@@ -14,6 +14,34 @@ from src.services.vector_store.base import VectorRecord, VectorStore
 
 LOGGER = logging.getLogger(__name__)
 
+# URL path segment → page_type label
+_PATH_TYPE_MAP: list[tuple[str, str]] = [
+    ("/services/", "service"),
+    ("/industries/", "industry"),
+    ("/case-studies", "case_study"),
+    ("/about", "about"),
+    ("/careers", "careers"),
+    ("/contact", "contact"),
+]
+
+
+def _page_metadata(url: str) -> dict:
+    """Return page_type and service_name metadata derived from the URL path."""
+    path = urlparse(url).path.rstrip("/")
+    page_type = "other"
+    for prefix, label in _PATH_TYPE_MAP:
+        if prefix in path:
+            page_type = label
+            break
+    if path in ("/", ""):
+        page_type = "home"
+
+    meta: dict = {"page_type": page_type}
+    if page_type == "service":
+        # e.g. /services/data-intelligence-analytics → data-intelligence-analytics
+        meta["service_name"] = path.split("/services/", 1)[-1]
+    return meta
+
 
 @dataclass(slots=True)
 class IngestionResult:
@@ -82,6 +110,7 @@ class WebsiteIngestor:
                 embeddings = self._embedding_service.embed_texts(
                     [chunk.text for chunk in chunks]
                 )
+                page_meta = _page_metadata(url)
                 records = [
                     VectorRecord(
                         source_type=self.source_name,
@@ -92,6 +121,7 @@ class WebsiteIngestor:
                             "url": url,
                             "start_word": chunk.start_word,
                             "end_word": chunk.end_word,
+                            **page_meta,
                         },
                         embedding=embedding,
                     )

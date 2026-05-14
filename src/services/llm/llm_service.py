@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 import requests
+
+LOGGER = logging.getLogger(__name__)
 
 # Compact prompt tuned for small instruction models: short, direct, hard rules only.
 _SYSTEM_PROMPT = """\
@@ -90,3 +94,45 @@ class LLMService:
         data = response.json()
 
         return data.get("response", "").strip()
+
+    def rewrite_query(self, question: str, chat_history: list[str]) -> str | None:
+        """Rewrite a vague follow-up into a standalone search query.
+
+        Returns a short query string, or None if the call fails or returns empty.
+        Uses temperature=0 and a small token budget — this is a lookup, not generation.
+        """
+        history_text = "\n".join(chat_history)
+        prompt = (
+            "Given the recent conversation and latest user message, rewrite the latest "
+            "message into a short standalone search query for retrieving Technossus "
+            "website content.\n\n"
+            "Return only the search query.\n"
+            "No explanation.\n"
+            "No markdown.\n\n"
+            f"Recent conversation:\n{history_text}\n\n"
+            f"Latest message:\n{question}\n\n"
+            "Search query:"
+        )
+
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/generate",
+                json={
+                    "model": self._model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.0,
+                        "num_predict": 30,
+                    },
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            result = response.json().get("response", "").strip()
+            # Take only the first line and strip stray quotes/backticks
+            result = result.split("\n")[0].strip().strip("\"'`")
+            return result or None
+        except Exception as exc:
+            LOGGER.warning("[LLM] query rewrite failed: %s", exc)
+            return None

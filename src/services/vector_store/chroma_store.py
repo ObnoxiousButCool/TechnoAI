@@ -16,8 +16,20 @@ class ChromaStore(VectorStore):
     def __init__(self, collection_name: str = "techno_ai") -> None:
         self.collection_name = collection_name
         self.client = chromadb.PersistentClient(path="./chroma_db")
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name
+        self.collection = self._get_collection()
+
+    def _get_collection(self):
+        """Return (or create) the collection with cosine distance.
+
+        Cosine distance keeps scores in [-1, 1] via score = 1 - distance,
+        which behaves correctly with the existing min_score filtering.
+        NOTE: the distance metric is only applied on collection *creation*.
+        After changing this setting, run DELETE /ingest/vectors then
+        POST /ingest/run to rebuild the collection with the correct metric.
+        """
+        return self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
         )
 
     def initialize(self, vector_size: int) -> None:
@@ -97,7 +109,5 @@ class ChromaStore(VectorStore):
 
         deleted_count = self.collection.count()
         self.client.delete_collection(name=self.collection_name)
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name
-        )
+        self.collection = self._get_collection()
         return deleted_count
