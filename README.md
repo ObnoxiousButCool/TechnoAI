@@ -41,12 +41,32 @@ disabled unless explicitly configured.
   ```
 
 - `POST /chat`
-  Answers a question using only retrieved website content.
+  Answers a question using only retrieved website content. Optionally accepts a
+  `session_id` to maintain conversational context across turns. If omitted, a new
+  session is created automatically and returned in the response.
 
   ```bash
+  # First turn — no session_id needed
   curl -X POST http://localhost:8000/chat \
     -H "Content-Type: application/json" \
-    -d '{"question":"What services does the company offer?"}'
+    -d '{"question":"What AI services does Technossus offer?"}'
+
+  # Follow-up turn — pass back the session_id from the previous response
+  curl -X POST http://localhost:8000/chat \
+    -H "Content-Type: application/json" \
+    -d '{"question":"Tell me more about the healthcare case study","session_id":"<session_id>"}'
+  ```
+
+  Response shape:
+  ```json
+  { "answer": "...", "sources": [...], "session_id": "<uuid>" }
+  ```
+
+- `DELETE /chat/session/{session_id}`
+  Clears chat memory for the given session (e.g. when the user starts a new conversation).
+
+  ```bash
+  curl -X DELETE http://localhost:8000/chat/session/<session_id>
   ```
 
 - `GET /health`

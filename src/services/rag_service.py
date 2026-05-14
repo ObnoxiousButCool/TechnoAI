@@ -1,13 +1,20 @@
 """RAG query orchestration."""
 
 from __future__ import annotations
-from venv import logger
+
+import logging
 
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.llm.llm_service import LLMService
+from src.services.query_resolver import CLARIFY_MSG, resolve
 from src.services.vector_store.base import SearchResult, VectorStore
 
-FALLBACK_RESPONSE = "I can only answer questions based on the website content."
+LOGGER = logging.getLogger(__name__)
+
+FALLBACK_RESPONSE = (
+    "I can help with questions based on Technossus website content. "
+    "You can ask about our services, industries, case studies, leadership, or AI capabilities."
+)
 
 
 class RAGService:
@@ -27,10 +34,18 @@ class RAGService:
         self._retrieval_top_k = retrieval_top_k
         self._retrieval_min_score = retrieval_min_score
 
-    def answer(self, question: str) -> dict:
+    def answer(self, question: str, chat_history: list[str] | None = None) -> dict:
         """Run the RAG pipeline and return the assistant answer."""
 
-        query_embedding = self._embedding_service.embed_text(question)
+        # Resolve follow-up references before vector search
+        retrieval_query, needs_clarification = resolve(question, chat_history)
+        LOGGER.info("[RAG] original question: %r", question)
+        LOGGER.info("[RAG] retrieval query:   %r", retrieval_query)
+
+        if needs_clarification:
+            return {"answer": CLARIFY_MSG, "sources": []}
+
+        query_embedding = self._embedding_service.embed_text(retrieval_query)
         search_results = self._vector_store.search(
             embedding=query_embedding,
             top_k=self._retrieval_top_k,
@@ -40,20 +55,21 @@ class RAGService:
             for result in search_results
             if result.score >= self._retrieval_min_score
         ]
-        # logger.info(
-        #     "RAG search found %d relevant results for question: %s. Results: %s",
-        #     len(relevant_results),
-        #     question,
-        #     relevant_results,
-        # )
+
+        for r in relevant_results:
+            src = r.metadata.get("url") or r.metadata.get("file_name", "?")
+            LOGGER.info("[RAG] retrieved: score=%.3f  source=%s", r.score, src)
+
         if not relevant_results:
-            return {
-                "answer": FALLBACK_RESPONSE,
-                "sources": [],
-            }
+            LOGGER.info("[RAG] no results above min_score threshold")
+            return {"answer": FALLBACK_RESPONSE, "sources": []}
 
         context = self._build_context(relevant_results)
-        answer = self._llm_service.answer_question(question=question, context=context)
+        answer = self._llm_service.answer_question(
+            question=question,
+            context=context,
+            chat_history=chat_history,
+        )
         if not answer:
             answer = FALLBACK_RESPONSE
         return {
