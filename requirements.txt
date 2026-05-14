@@ -10,10 +10,7 @@ python-dotenv==1.1.1
 # HTTP client (Ollama calls, sitemap fetching)
 requests==2.32.4
 
-# Vector store — ChromaDB (active)
-chromadb==1.5.7
-
-# Vector store — PostgreSQL/pgvector (dormant, ready for migration)
+# Vector store — PostgreSQL + pgvector
 pgvector==0.3.6
 psycopg[binary]==3.2.9
 

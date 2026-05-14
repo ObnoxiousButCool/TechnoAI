@@ -10,13 +10,25 @@ from src.services.ingestion.pipeline import IngestionPipeline
 from src.services.ingestion.website_ingestor import WebsiteIngestor
 from src.services.llm.llm_service import LLMService
 from src.services.rag_service import RAGService
-from src.services.vector_store.chroma_store import ChromaStore
+from src.services.vector_store.base import VectorStore
+from src.services.vector_store.pgvector_store import PGVectorStore
 
 
-def get_vector_store() -> ChromaStore:
-    """Build the configured vector store."""
+def get_vector_store() -> VectorStore:
+    """Build the configured vector store.
 
-    return ChromaStore()
+    Reads VECTOR_STORE_TYPE from settings.  Currently only "pgvector" is
+    supported; the ChromaDB path has been removed.
+    """
+
+    settings = get_settings()
+    store_type = settings.vector_store_type.lower()
+    if store_type == "pgvector":
+        return PGVectorStore(database_url=settings.database_url)
+    raise ValueError(
+        f"Unsupported VECTOR_STORE_TYPE '{store_type}'. "
+        "Set VECTOR_STORE_TYPE=pgvector in your .env file."
+    )
 
 
 def get_embedding_service() -> EmbeddingService:

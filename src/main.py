@@ -30,7 +30,7 @@ async def lifespan(_: FastAPI):
     """Initialize dependencies required at startup."""
 
     settings = get_settings()
-    get_vector_store().initialize(vector_size=settings.openai_embedding_dimensions)
+    get_vector_store().initialize(vector_size=settings.embedding_dimensions)
     Scheduler().start()
     yield
 

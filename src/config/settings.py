@@ -26,6 +26,13 @@ class Settings(BaseSettings):
         default="gpt-4.1-mini",
         alias="OPENAI_CHAT_MODEL",
     )
+
+    # Active vector store: "pgvector" (default) or "chroma"
+    vector_store_type: str = Field(default="pgvector", alias="VECTOR_STORE_TYPE")
+
+    # Embedding output dimension — nomic-embed-text produces 768-dim vectors
+    embedding_dimensions: int = Field(default=768, alias="EMBEDDING_DIMENSIONS")
+
     database_url: str = Field(
         default="postgresql://postgres:postgres@db:5432/techno_ai",
         alias="DATABASE_URL",

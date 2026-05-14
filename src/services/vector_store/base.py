@@ -31,6 +31,10 @@ class VectorStore(ABC):
     """Abstract vector store contract."""
 
     @abstractmethod
+    def initialize(self, vector_size: int) -> None:
+        """Create required schema objects (idempotent)."""
+
+    @abstractmethod
     def upsert(self, vectors: list[VectorRecord]) -> None:
         """Insert or update vectors in the store."""
 
