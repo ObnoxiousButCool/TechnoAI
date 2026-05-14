@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from contextlib import contextmanager
 from typing import Iterator
@@ -10,6 +9,7 @@ from typing import Iterator
 from pgvector.psycopg import register_vector
 from psycopg import connect
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from src.services.vector_store.base import SearchResult, VectorRecord, VectorStore
 
@@ -96,7 +96,7 @@ class PGVectorStore(VectorStore):
                 record.source_type,
                 record.source_id,
                 record.content,
-                json.dumps(record.metadata),
+                Jsonb(record.metadata),
                 record.embedding,
             )
             for record in vectors
