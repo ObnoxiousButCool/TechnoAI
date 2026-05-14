@@ -22,13 +22,24 @@ def get_vector_store() -> ChromaStore:
 def get_embedding_service() -> EmbeddingService:
     """Build the embedding service."""
 
-    return EmbeddingService(model="nomic-embed-text")
+    settings = get_settings()
+    return EmbeddingService(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_embedding_model,
+    )
 
 
 def get_llm_service() -> LLMService:
     """Build the LLM service."""
 
-    return LLMService(model="llama3.1:8b")
+    settings = get_settings()
+    return LLMService(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_model,
+        temperature=settings.ollama_temperature,
+        top_p=settings.ollama_top_p,
+        num_predict=settings.ollama_num_predict,
+    )
 
 
 def get_rag_service() -> RAGService:

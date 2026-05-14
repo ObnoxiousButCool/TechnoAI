@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     request_timeout_seconds: int = 30
     user_agent: str = "Techno-AI/1.0"
 
+    # Ollama — shared base URL for both LLM and embedding calls
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        alias="OLLAMA_BASE_URL",
+    )
+    ollama_model: str = Field(default="llama3.2:8b", alias="OLLAMA_MODEL")
+    ollama_embedding_model: str = Field(
+        default="nomic-embed-text",
+        alias="OLLAMA_EMBEDDING_MODEL",
+    )
+    ollama_temperature: float = Field(default=0.2, alias="OLLAMA_TEMPERATURE")
+    ollama_top_p: float = Field(default=0.8, alias="OLLAMA_TOP_P")
+    ollama_num_predict: int = Field(default=180, alias="OLLAMA_NUM_PREDICT")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

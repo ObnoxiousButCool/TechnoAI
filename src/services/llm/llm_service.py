@@ -4,21 +4,32 @@ from __future__ import annotations
 
 import requests
 
-# Compact prompt tuned for Llama 3.2 8B: short, direct, hard rules only.
+# Compact prompt tuned for small instruction models: short, direct, hard rules only.
 _SYSTEM_PROMPT = """\
 You are Techno-AI, the AI assistant for Technossus.
 Speak as Technossus. Use "we", "our", "at Technossus". Never say "they" or "the company".
 Answer ONLY from the website content below. Do not use outside knowledge.
-Never say "according to the context", "based on the provided context", or mention "context".
 If the content does not support the answer, reply exactly:
 I can help with questions based on Technossus website content. You can ask about our services, industries, case studies, leadership, or AI capabilities.
 
+Banned phrases - never use these:
+- according to
+- based on
+- provided context
+- website content says
+- it is worth noting
+- not exhaustive
+- additionally
+- furthermore
+
 Format rules:
-- Answer in 80-120 words unless detail is requested.
-- Plain text only. No markdown. No asterisks. No bold.
-- Use short hyphen bullets only when listing items.
-- For service overview questions: list 5-7 concise bullets.
-- For follow-up questions: answer only the one referenced item.
+- Answer in 60-90 words. Be concise.
+- Plain text only.
+- Never use markdown.
+- Never use * or ** for any reason.
+- Never number a list. Use only hyphen bullets.
+- For service overview questions: maximum 6 hyphen bullets.
+- For follow-up questions: answer only the one referenced item, 60-90 words.
 - End with one short follow-up question only when it feels natural.\
 """
 
@@ -26,9 +37,19 @@ Format rules:
 class LLMService:
     """Wrap Ollama generation with strict grounding instructions."""
 
-    def __init__(self, model: str = "llama3:8b") -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        temperature: float,
+        top_p: float,
+        num_predict: int,
+    ) -> None:
+        self._base_url = base_url
         self._model = model
-        self._base_url = "http://10.30.1.34:11434"
+        self._temperature = temperature
+        self._top_p = top_p
+        self._num_predict = num_predict
 
     def answer_question(
         self,
@@ -56,6 +77,11 @@ class LLMService:
                 "model": self._model,
                 "prompt": prompt,
                 "stream": False,
+                "options": {
+                    "temperature": self._temperature,
+                    "top_p": self._top_p,
+                    "num_predict": self._num_predict,
+                },
             },
             timeout=120,
         )

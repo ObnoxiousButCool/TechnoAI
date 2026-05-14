@@ -10,12 +10,21 @@ from __future__ import annotations
 import re
 
 _ORDINAL_MAP: dict[str, int] = {
-    "first": 1, "1st": 1,
-    "second": 2, "2nd": 2,
-    "third": 3, "3rd": 3,
-    "fourth": 4, "4th": 4,
-    "fifth": 5, "5th": 5,
+    "first": 1, "1st": 1, "one": 1,
+    "second": 2, "2nd": 2, "two": 2,
+    "third": 3, "3rd": 3, "three": 3,
+    "fourth": 4, "4th": 4, "four": 4,
+    "fifth": 5, "5th": 5, "five": 5,
+    "sixth": 6, "6th": 6, "six": 6,
 }
+
+# Ordered by specificity — first match wins
+_CATEGORY_HINTS: list[tuple[str, str]] = [
+    ("case stud", "case study"),
+    ("industr", "industry"),
+    ("capabilit", "capability"),
+    ("service", "service"),
+]
 
 # Phrases that signal the user is referencing something from history
 _VAGUE_REF_RE = re.compile(
@@ -63,6 +72,28 @@ def _first_topic(text: str) -> str | None:
     return None
 
 
+def _detect_category(question: str, last_text: str) -> str:
+    """Return a category word to append to the rewritten query.
+
+    Checks the user question first, then the preamble of the assistant
+    response (text before the numbered list). Defaults to 'service'.
+    """
+    lower_q = question.lower()
+    for hint, category in _CATEGORY_HINTS:
+        if hint in lower_q:
+            return category
+
+    # Look at text before the first numbered item for context
+    first_num = re.search(r'(?m)^\s*\d+[.)]\s', last_text)
+    preamble = last_text[: first_num.start()] if first_num else last_text[:300]
+    lower_preamble = preamble.lower()
+    for hint, category in _CATEGORY_HINTS:
+        if hint in lower_preamble:
+            return category
+
+    return "service"
+
+
 CLARIFY_MSG = (
     "Could you clarify which one you mean? "
     "I mentioned a few items — just let me know which you'd like me to expand on."
@@ -96,7 +127,8 @@ def resolve(question: str, history: list[str] | None) -> tuple[str, bool]:
     if ordinal is not None:
         items = _numbered_items(last_text)
         if items and ordinal <= len(items):
-            return f"{items[ordinal - 1]} Technossus", False
+            category = _detect_category(question, last_text)
+            return f"{items[ordinal - 1]} Technossus {category}", False
         # Ordinal mentioned but no list found — fall through
 
     # Detect vague reference or elaboration verb
@@ -106,12 +138,14 @@ def resolve(question: str, history: list[str] | None) -> tuple[str, bool]:
     if has_vague or has_elaboration:
         items = _numbered_items(last_text)
         if len(items) == 1:
-            return f"{items[0]} Technossus", False
+            category = _detect_category(question, last_text)
+            return f"{items[0]} Technossus {category}", False
         if len(items) > 1:
             return question, True  # ambiguous — ask to clarify
         # No numbered list — grab first topic line
         topic = _first_topic(last_text)
         if topic:
-            return f"{topic} Technossus", False
+            category = _detect_category(question, last_text)
+            return f"{topic} Technossus {category}", False
 
     return question, False

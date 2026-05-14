@@ -72,6 +72,41 @@ disabled unless explicitly configured.
 - `GET /health`
   Basic health endpoint.
 
+## Configuration
+
+All runtime-tunable values are controlled via `.env`. Copy `.env.example` to `.env` to start.
+
+### Switching Ollama models
+
+Change `OLLAMA_MODEL` in `.env` and restart the backend — no code changes needed:
+
+```
+OLLAMA_MODEL=qwen2.5:7b-instruct
+```
+
+To point at a different Ollama server:
+
+```
+OLLAMA_BASE_URL=http://10.30.1.34:11434
+```
+
+### Tuning response generation
+
+| Variable | Default | Effect |
+|---|---|---|
+| `OLLAMA_TEMPERATURE` | `0.2` | Lower = more deterministic answers |
+| `OLLAMA_TOP_P` | `0.8` | Nucleus sampling threshold |
+| `OLLAMA_NUM_PREDICT` | `180` | Max tokens per response (~130 words) |
+
+### Tuning retrieval
+
+| Variable | Default | Effect |
+|---|---|---|
+| `RETRIEVAL_TOP_K` | `5` | Number of chunks retrieved per query |
+| `RETRIEVAL_MIN_SCORE` | `0.25` | Minimum similarity score to include a chunk |
+| `CHUNK_SIZE_WORDS` | `700` | Ingestion chunk size (requires re-ingestion) |
+| `CHUNK_OVERLAP_WORDS` | `100` | Overlap between chunks (requires re-ingestion) |
+
 ## Notes
 
 - PostgreSQL uses the `pgvector` extension for similarity search.

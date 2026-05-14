@@ -8,9 +8,9 @@ import requests
 class EmbeddingService:
     """Wrap embedding model calls using Ollama."""
 
-    def __init__(self, model: str = "nomic-embed-text") -> None:
+    def __init__(self, base_url: str, model: str) -> None:
+        self._base_url = base_url
         self._model = model
-        self._base_url = "http://localhost:11434"
 
     def embed_text(self, text: str) -> list[float]:
         """Generate a single embedding."""
