@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree
-from typing import Optional
 
 import requests
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser, Playwright
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,8 +30,8 @@ class SitemapCrawler:
         self._timeout = timeout
         self._session = requests.Session()
         self._session.headers.update({"User-Agent": user_agent})
-        self._playwright: Optional[object] = None
-        self._browser: Optional[object] = None
+        self._playwright: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
 
     def discover_urls(self) -> list[str]:
         """Resolve URLs from a sitemap or sitemap index."""
@@ -65,6 +68,7 @@ class SitemapCrawler:
             self._playwright = sync_playwright().start()
             self._browser = self._playwright.chromium.launch(headless=True)
 
+        assert self._browser is not None
         page = self._browser.new_page()
         try:
             page.goto(
