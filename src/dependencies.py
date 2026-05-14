@@ -22,7 +22,6 @@ def get_vector_store() -> ChromaStore:
 def get_embedding_service() -> EmbeddingService:
     """Build the embedding service."""
 
-    settings = get_settings()
     return EmbeddingService(model="nomic-embed-text")
 
 
