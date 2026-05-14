@@ -1,14 +1,14 @@
 # Web framework
-fastapi==0.116.1
+# fastapi==0.116.1
 uvicorn[standard]==0.35.0
 
 # Data validation / settings
 pydantic==2.11.7
 pydantic-settings==2.10.1
-python-dotenv==1.1.1
+
 
 # HTTP client (Ollama calls, sitemap fetching)
-requests==2.32.4
+
 
 # Vector store — PostgreSQL + pgvector
 pgvector==0.3.6
@@ -21,4 +21,9 @@ playwright==1.59.0
 beautifulsoup4==4.13.4
 
 # PDF ingestion
-pypdf==5.9.0
+
+
+python-dotenv==1.2.2
+requests==2.33.0
+pypdf==6.10.2
+fastapi>=0.121.0
