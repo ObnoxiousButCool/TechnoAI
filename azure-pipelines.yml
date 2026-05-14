@@ -1,0 +1,223 @@
+# ============================================================
+# CI Pipeline — Technossus Website V2 (API / FastAPI)
+# Azure Pipelines | Python 3.12
+#
+# Stages:
+#   1. audit     — pip-audit vulnerability scan + config review
+#   2. quality   — ruff lint + mypy type check
+#   3. build     — install & smoke-test application startup
+# ============================================================
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - release/*
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  PYTHON_VERSION: '3.12'
+  PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
+
+# ─────────────────────────────────────────────
+# STAGE 1 — Audit
+# ─────────────────────────────────────────────
+stages:
+  - stage: Audit
+    displayName: '1 · Dependency & Config Audit'
+    jobs:
+      - job: DependencySecurityAudit
+        displayName: 'pip-audit (vulnerability scan)'
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(PYTHON_VERSION)'
+            inputs:
+              versionSpec: $(PYTHON_VERSION)
+              addToPath: true
+
+          - task: Cache@2
+            displayName: 'Cache pip packages'
+            inputs:
+              key: '"pip" | "$(Agent.OS)" | requirements.txt'
+              restoreKeys: '"pip" | "$(Agent.OS)"'
+              path: $(PIP_CACHE_DIR)
+
+          - script: pip install --upgrade pip pip-audit
+            displayName: 'Install pip-audit'
+
+          # pip-audit exits non-zero when vulnerabilities are found.
+          # Remove --strict to report-only without failing the pipeline.
+          - script: pip-audit -r requirements.txt --strict
+            displayName: 'Audit Python dependencies for CVEs'
+
+      - job: ConfigAudit
+        displayName: 'Configuration audit'
+        steps:
+          - checkout: self
+
+          # ── CORS settings ────────────────────────────────────────────
+          - script: |
+              echo "──────────────────────────────────────────────────────"
+              echo "Auditing CORS configuration (src/main.py)"
+              echo "──────────────────────────────────────────────────────"
+
+              ISSUES=0
+
+              if grep -rq 'allow_origins=\["*"\]' src/main.py 2>/dev/null; then
+                echo "##vso[task.logissue type=warning]src/main.py: CORSMiddleware allow_origins is set to ['*'] — restrict to known frontend origins in production."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              if grep -rq 'allow_methods=\["*"\]' src/main.py 2>/dev/null; then
+                echo "##vso[task.logissue type=warning]src/main.py: CORSMiddleware allow_methods is set to ['*'] — explicitly list permitted HTTP methods."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              echo "CORS audit complete — $ISSUES issue(s) found."
+            displayName: 'Audit CORS settings'
+
+          # ── Settings / env vars ───────────────────────────────────────
+          - script: |
+              echo "──────────────────────────────────────────────────────"
+              echo "Auditing settings (src/config/settings.py)"
+              echo "──────────────────────────────────────────────────────"
+
+              ISSUES=0
+
+              # Detect default empty API key
+              if grep -q 'default=""' src/config/settings.py 2>/dev/null; then
+                echo "##vso[task.logissue type=warning]src/config/settings.py: One or more secrets have an empty string default. Ensure OPENAI_API_KEY (and others) are injected via pipeline secret variables and never hard-coded."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              # Detect default open database URL containing credentials
+              if grep -qE 'postgresql://[^@]+:[^@]+@' src/config/settings.py 2>/dev/null; then
+                echo "##vso[task.logissue type=warning]src/config/settings.py: DATABASE_URL default contains embedded credentials. Use a Key Vault reference or pipeline secret variable instead."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              # Detect 0.0.0.0 bind address
+              if grep -q '0.0.0.0' src/config/settings.py 2>/dev/null; then
+                echo "##vso[task.logissue type=warning]src/config/settings.py: app_host defaults to 0.0.0.0 — acceptable inside Docker, but confirm this is intentional."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              echo "Settings audit complete — $ISSUES issue(s) found."
+            displayName: 'Audit settings.py defaults'
+
+          # ── Docker / deployment artefacts ─────────────────────────────
+          - script: |
+              echo "──────────────────────────────────────────────────────"
+              echo "Auditing deployment artefacts"
+              echo "──────────────────────────────────────────────────────"
+
+              ISSUES=0
+
+              if [ ! -f Dockerfile ]; then
+                echo "##vso[task.logissue type=warning]Dockerfile not found — README references 'docker compose up --build' but no Dockerfile exists in the repo root."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ]; then
+                echo "##vso[task.logissue type=warning]docker-compose.yml not found — README references docker compose but no compose file exists."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              if [ ! -f .env.example ]; then
+                echo "##vso[task.logissue type=warning].env.example not found — README instructs copying .env.example but the template file is missing from the repo."
+                ISSUES=$((ISSUES + 1))
+              fi
+
+              echo "Deployment artefact audit complete — $ISSUES issue(s) found."
+            displayName: 'Audit deployment artefacts'
+
+  # ─────────────────────────────────────────────
+  # STAGE 2 — Code Quality
+  # ─────────────────────────────────────────────
+  - stage: Quality
+    displayName: '2 · Code Quality'
+    dependsOn: Audit
+    condition: succeeded()
+    jobs:
+      - job: Lint
+        displayName: 'ruff lint'
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(PYTHON_VERSION)'
+            inputs:
+              versionSpec: $(PYTHON_VERSION)
+
+          - script: pip install ruff
+            displayName: 'Install ruff'
+
+          - script: ruff check src/
+            displayName: 'Run ruff linter'
+
+      - job: TypeCheck
+        displayName: 'mypy type check'
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(PYTHON_VERSION)'
+            inputs:
+              versionSpec: $(PYTHON_VERSION)
+
+          - script: |
+              pip install -r requirements.txt
+              pip install mypy
+            displayName: 'Install dependencies + mypy'
+
+          # mypy is run in non-strict mode initially — add --strict once
+          # all type annotations are in place.
+          - script: mypy src/ --ignore-missing-imports
+            displayName: 'Run mypy type check'
+            continueOnError: true
+
+  # ─────────────────────────────────────────────
+  # STAGE 3 — Build / Smoke Test
+  # ─────────────────────────────────────────────
+  - stage: Build
+    displayName: '3 · Build & Smoke Test'
+    dependsOn: Quality
+    condition: succeeded()
+    jobs:
+      - job: InstallAndImport
+        displayName: 'Install deps & validate app import'
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(PYTHON_VERSION)'
+            inputs:
+              versionSpec: $(PYTHON_VERSION)
+
+          - task: Cache@2
+            displayName: 'Cache pip packages'
+            inputs:
+              key: '"pip" | "$(Agent.OS)" | requirements.txt'
+              restoreKeys: '"pip" | "$(Agent.OS)"'
+              path: $(PIP_CACHE_DIR)
+
+          - script: pip install -r requirements.txt
+            displayName: 'Install application dependencies'
+
+          # Validate that the FastAPI app can be imported without runtime errors.
+          # Uses a dummy OPENAI_API_KEY to satisfy the non-optional setting.
+          - script: |
+              python - <<'EOF'
+              import os
+              os.environ.setdefault("OPENAI_API_KEY", "ci-placeholder-key")
+              from src.main import create_app
+              app = create_app()
+              assert app is not None, "create_app() returned None"
+              print("App import OK — FastAPI app created successfully.")
+              EOF
+            displayName: 'Smoke test: import and create FastAPI app'
+            env:
+              OPENAI_API_KEY: $(OPENAI_API_KEY_CI)
