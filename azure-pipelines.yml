@@ -27,7 +27,7 @@ pool:
 variables:
   PYTHON_VERSION: '3.12'
   PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
-  AZURE_SERVICE_CONNECTION: 'Ntn Subscription – MPN (4ccd85e4-c992-42b9-9810-91141745e007)'
+  AZURE_SERVICE_CONNECTION: 'Technossus-Azure-ServiceConnection'
   WEBAPP_NAME: 'Technossus-API-Dev'
   RESOURCE_GROUP: 'RG-Technossus-WebV2'
 
