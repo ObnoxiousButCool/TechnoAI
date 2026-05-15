@@ -289,7 +289,6 @@ stages:
                     azureSubscription: $(AZURE_SERVICE_CONNECTION)
                     appType: webAppLinux
                     appName: $(WEBAPP_NAME)
-                    resourceGroupName: $(RESOURCE_GROUP)
                     package: '$(Build.ArtifactStagingDirectory)/app.zip'
                     runtimeStack: 'PYTHON|3.12'
                     startUpCommand: 'gunicorn -w 2 -k uvicorn.workers.UvicornWorker src.main:app --bind 0.0.0.0:8000'
