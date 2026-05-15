@@ -27,6 +27,9 @@ pool:
 variables:
   PYTHON_VERSION: '3.12'
   PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
+  AZURE_SERVICE_CONNECTION: 'Ntn Subscription – MPN (4ccd85e4-c992-42b9-9810-91141745e007)'
+  WEBAPP_NAME: 'Technossus-API-Dev'
+  RESOURCE_GROUP: 'RG-Technossus-WebV2'
 
 # ─────────────────────────────────────────────
 # STAGE 1 — Audit
@@ -221,3 +224,72 @@ stages:
             displayName: 'Smoke test: import and create FastAPI app'
             env:
               OPENAI_API_KEY: $(OPENAI_API_KEY_CI)
+
+# ─────────────────────────────────────────────
+# STAGE 4 — Deploy (main branch only)
+# ─────────────────────────────────────────────
+  - stage: Deploy
+    displayName: '4 · Deploy to Azure App Service (Dev)'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToAppService
+        displayName: 'Deploy FastAPI app to Technossus-API-Dev'
+        environment: 'APIV2-Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: UsePythonVersion@0
+                  displayName: 'Use Python $(PYTHON_VERSION)'
+                  inputs:
+                    versionSpec: $(PYTHON_VERSION)
+                    addToPath: true
+
+                # Install dependencies into a local folder so they are
+                # included in the deployment package.
+                - script: |
+                    pip install --target=".python_packages/lib/site-packages" -r requirements.txt
+                  displayName: 'Install dependencies into package folder'
+
+                # Zip the application source + installed packages.
+                - task: ArchiveFiles@2
+                  displayName: 'Archive application into zip'
+                  inputs:
+                    rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+                    includeRootFolder: false
+                    archiveType: zip
+                    archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+                    replaceExistingArchive: true
+                    excludePaths: |
+                      .git
+                      .venv
+                      __pycache__
+                      chroma_db
+                      *.pyc
+
+                # Publish the zip as a pipeline artifact so it can be
+                # downloaded or promoted to other stages/environments.
+                - task: PublishBuildArtifacts@1
+                  displayName: 'Publish app.zip artifact'
+                  inputs:
+                    PathtoPublish: '$(Build.ArtifactStagingDirectory)/app.zip'
+                    ArtifactName: 'api-drop'
+                    publishLocation: Container
+
+                # Deploy to Azure App Service (Linux).
+                # Requires an Azure Resource Manager service connection named
+                # $(AZURE_SERVICE_CONNECTION) with at least "Contributor" on
+                # the target App Service / resource group.
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Technossus-API-Dev'
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    appType: webAppLinux
+                    appName: $(WEBAPP_NAME)
+                    resourceGroupName: $(RESOURCE_GROUP)
+                    package: '$(Build.ArtifactStagingDirectory)/app.zip'
+                    runtimeStack: 'PYTHON|3.12'
+                    startUpCommand: 'gunicorn -w 2 -k uvicorn.workers.UvicornWorker src.main:app --bind 0.0.0.0:8000'
