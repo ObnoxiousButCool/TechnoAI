@@ -68,6 +68,13 @@ _SERVICE_SLUG_MAP: list[tuple[str, str]] = [
     ("testimonial", "about"),
     ("clients say", "about"),
     ("what clients", "about"),
+    ("contact", "contact"),
+    ("reach out", "contact"),
+    ("get in touch", "contact"),
+    ("phone", "contact"),
+    ("email", "contact"),
+    ("office", "contact"),
+    ("location", "contact"),
     ("leadership", "about"),
     ("leaders", "about"),
     ("executive", "about"),
@@ -108,7 +115,7 @@ class RAGService:
         # Deterministic intercept — always consistent, no LLM needed.
         if _is_service_overview(question):
             LOGGER.info("[RAG] service overview intercept")
-            return {"answer": _SERVICE_OVERVIEW_ANSWER, "sources": []}
+            return {"answer": _SERVICE_OVERVIEW_ANSWER, "sources": [], "follow_ups": []}
 
         history = chat_history or []
 
@@ -146,6 +153,11 @@ class RAGService:
                     self._build_context(slug_chunks),
                     chat_history,
                 )
+                follow_ups = self._llm_service.generate_follow_ups(
+                    question,
+                    answer or FALLBACK_RESPONSE,
+                    history,
+                )
                 return {
                     "answer": answer or FALLBACK_RESPONSE,
                     "sources": [
@@ -156,6 +168,7 @@ class RAGService:
                         }
                         for c in slug_chunks
                     ],
+                    "follow_ups": follow_ups,
                 }
 
         query_embedding = self._embedding_service.embed_text(retrieval_query)
@@ -170,7 +183,7 @@ class RAGService:
 
         if not relevant_results:
             LOGGER.info("[RAG] no results above min_score threshold")
-            return {"answer": FALLBACK_RESPONSE, "sources": []}
+            return {"answer": FALLBACK_RESPONSE, "sources": [], "follow_ups": []}
 
         for r in relevant_results:
             src = r.metadata.get("url") or r.metadata.get("file_name", "?")
@@ -187,6 +200,11 @@ class RAGService:
         )
         if not answer:
             answer = FALLBACK_RESPONSE
+        follow_ups = self._llm_service.generate_follow_ups(
+            question,
+            answer,
+            history,
+        )
         return {
             "answer": answer,
             "sources": [
@@ -197,6 +215,7 @@ class RAGService:
                 }
                 for result in relevant_results
             ],
+            "follow_ups": follow_ups,
         }
 
     @staticmethod

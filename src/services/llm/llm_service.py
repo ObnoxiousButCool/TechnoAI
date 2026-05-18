@@ -1,12 +1,22 @@
-"""LLM response generation constrained to retrieved context using Ollama."""
+﻿"""LLM response generation constrained to retrieved context using Ollama."""
 
 from __future__ import annotations
 
+import json
 import logging
 
 import requests
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _fix_encoding(text: str) -> str:
+    return (
+        text.replace("â", "'")
+            .replace("â", '"')
+            .replace("â", '"')
+    )
+
 
 _SYSTEM_PROMPT = """\
 You are Techno-AI, the intelligent assistant built into the Technossus
@@ -20,6 +30,12 @@ verbatim or be directly inferable from that content. If the content
 does not clearly support the answer, you MUST respond with exactly
 this message and nothing else:
 I can help with questions based on Technossus website content. You can ask about our services, industries, case studies, leadership, or AI capabilities.
+
+CONTACT RULE:
+This rule ONLY applies when the user's question explicitly asks for contact information, a phone number, an email address, office locations, or how to get in touch.
+For ALL other questions, ignore this rule entirely and do not mention contact details.
+When the rule applies, respond with exactly this and nothing else:
+You can reach us at contact@technossus.com or call +1 (949) 769-3500. You can also visit our contact page at https://technossus.com/contact to fill out a form and our team will get back to you.
 
 Never invent, estimate, or extrapolate statistics, percentages,
 dates, names, or outcomes. If a number is not in the content,
@@ -43,7 +59,7 @@ Format rules:
 - For service overview questions: maximum 6 hyphen bullets.
 - For follow-up questions: answer only the one referenced item,
   60-90 words, plain text.
-- End with one short follow-up question only when it feels natural.
+- Do not end with a question. Never append a follow-up question to your answer. Follow-up suggestions are handled separately.
 
 If you are ever unsure whether the content supports your answer,
 default to the fallback message above. An honest fallback is
@@ -119,10 +135,66 @@ class LLMService:
             response.raise_for_status()
             data = response.json()
 
-            return data.get("response", "").strip()
+            return _fix_encoding(data.get("response", "").strip())
         except Exception as exc:
             LOGGER.error("[LLM] answer_question failed: %s", exc)
             return "I'm having trouble connecting right now. Please try again in a moment."
+
+    def generate_follow_ups(
+        self,
+        question: str,
+        answer: str,
+        chat_history: list[str] | None = None,
+    ) -> list[str]:
+        """Generate 2-3 contextually relevant follow-up suggestions."""
+        history_text = ""
+        if chat_history:
+            history_text = (
+                "Conversation so far:\n"
+                + "\n".join(chat_history)
+                + "\n\n"
+            )
+        prompt = (
+            "You are generating follow-up question suggestions for "
+            "a chatbot on the Technossus website.\n\n"
+            f"{history_text}"
+            f"The user just asked: {question}\n"
+            f"The assistant just answered: {answer}\n\n"
+            "Generate exactly 3 short follow-up questions a user "
+            "might naturally ask next. Each must be:\n"
+            "- Directly related to what was just discussed\n"
+            "- Phrased as something the user would type\n"
+            "- Under 10 words\n"
+            "- Varied — don't repeat the same topic\n\n"
+            "Return only a JSON array of 3 strings. "
+            "No explanation. No markdown. Example format:\n"
+            '["Question one?", "Question two?", "Question three?"]\n\n'
+            "JSON array:"
+        )
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/generate",
+                json={
+                    "model": self._rewrite_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.4,
+                        "num_predict": 80,
+                    },
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            raw = response.json().get("response", "").strip()
+            raw = raw.strip("```json").strip("```").strip()
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [_fix_encoding(str(s)) for s in parsed[:3]]
+            return []
+        except Exception as exc:
+            LOGGER.warning("[LLM] follow_ups generation failed: %s", exc)
+            return []
 
     def rewrite_query(self, question: str, chat_history: list[str]) -> str | None:
         """Rewrite a vague follow-up into a standalone search query.

@@ -28,6 +28,7 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[dict]
     session_id: str
+    follow_ups: list[str] = Field(default_factory=list)
 
 
 @router.post("", response_model=ChatResponse)
@@ -58,6 +59,7 @@ def chat(request: Request, payload: ChatRequest) -> ChatResponse:
         answer=result["answer"],
         sources=result["sources"],
         session_id=session_id,
+        follow_ups=result.get("follow_ups", []),
     )
 
 
