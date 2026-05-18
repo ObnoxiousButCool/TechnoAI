@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import numpy as np
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -109,7 +110,7 @@ class PGVectorStore(VectorStore):
 
     def search(self, embedding: list[float], top_k: int) -> list[SearchResult]:
         """Search vectors by cosine similarity."""
-
+        embedding = np.array(embedding)
         query = """
             SELECT
                 id,
