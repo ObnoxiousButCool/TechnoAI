@@ -13,20 +13,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    openai_embedding_model: str = Field(
-        default="text-embedding-3-small",
-        alias="OPENAI_EMBEDDING_MODEL",
+    admin_api_key: str = Field(alias="ADMIN_API_KEY")
+    allowed_origins: str = Field(
+        default="http://localhost:3000,http://localhost:5173",
+        alias="ALLOWED_ORIGINS",
     )
-    openai_embedding_dimensions: int = Field(
-        default=1536,
-        alias="OPENAI_EMBEDDING_DIMENSIONS",
-    )
-    openai_chat_model: str = Field(
-        default="gpt-4.1-mini",
-        alias="OPENAI_CHAT_MODEL",
-    )
-
     # Active vector store: "pgvector" (default) or "chroma"
     vector_store_type: str = Field(default="pgvector", alias="VECTOR_STORE_TYPE")
 
@@ -51,7 +42,7 @@ class Settings(BaseSettings):
     chunk_size_words: int = Field(default=700, alias="CHUNK_SIZE_WORDS")
     chunk_overlap_words: int = Field(default=100, alias="CHUNK_OVERLAP_WORDS")
     retrieval_top_k: int = Field(default=5, alias="RETRIEVAL_TOP_K")
-    retrieval_min_score: float = Field(default=0.25, alias="RETRIEVAL_MIN_SCORE")
+    retrieval_min_score: float = Field(default=0.42, alias="RETRIEVAL_MIN_SCORE")
     request_timeout_seconds: int = 30
     user_agent: str = "Techno-AI/1.0"
 
@@ -61,6 +52,10 @@ class Settings(BaseSettings):
         alias="OLLAMA_BASE_URL",
     )
     ollama_model: str = Field(default="llama3.2:8b", alias="OLLAMA_MODEL")
+    ollama_rewrite_model: str = Field(
+        default="gemma3:1b",
+        alias="OLLAMA_REWRITE_MODEL",
+    )
     ollama_embedding_model: str = Field(
         default="nomic-embed-text",
         alias="OLLAMA_EMBEDDING_MODEL",

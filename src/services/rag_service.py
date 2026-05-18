@@ -62,6 +62,17 @@ _SERVICE_SLUG_MAP: list[tuple[str, str]] = [
     ("digital experience design", "digital-experience-design"),
     ("product engineering", "product-engineering"),
     ("quality engineering", "quality-engineering"),
+    ("case study", "case-studies"),
+    ("case studies", "case-studies"),
+    ("our work", "case-studies"),
+    ("testimonial", "about"),
+    ("clients say", "about"),
+    ("what clients", "about"),
+    ("leadership", "about"),
+    ("leaders", "about"),
+    ("executive", "about"),
+    ("team members", "about"),
+    ("who is", "about"),
 ]
 
 
@@ -97,16 +108,11 @@ class RAGService:
         # Deterministic intercept — always consistent, no LLM needed.
         if _is_service_overview(question):
             LOGGER.info("[RAG] service overview intercept")
-            print(f"[DEBUG] service overview intercept for: {question!r}")
             return {"answer": _SERVICE_OVERVIEW_ANSWER, "sources": []}
 
         history = chat_history or []
 
         LOGGER.info("[RAG] user message: %r", question)
-        print(f"[DEBUG] user message        : {question!r}")
-        print(f"[DEBUG] history passed      : {len(history)} entries")
-        for entry in history:
-            print(f"[DEBUG]   {entry[:120]!r}")
 
         # SLM rewrite — always fires before retrieval.
         # The SLM resolves ordinals ("3rd one"), vague refs ("yes please",
@@ -116,7 +122,41 @@ class RAGService:
             self._llm_service.rewrite_query(question, history) or question
         )
         LOGGER.info("[RAG] retrieval query: %r", retrieval_query)
-        print(f"[DEBUG] retrieval query     : {retrieval_query!r}")
+
+        service_slug = _service_slug_for_query(retrieval_query)
+        if service_slug:
+            slug_chunks = self._vector_store.get_by_url(service_slug)
+            if slug_chunks:
+                if service_slug == "about":
+                    leadership_chunks = [
+                        c for c in slug_chunks
+                        if any(kw in c.content for kw in (
+                            "FOUNDER", "MANAGING PARTNER", "DIRECTOR",
+                            "PRESIDENT", "VICE PRESIDENT", "CEO",
+                        ))
+                    ]
+                    if leadership_chunks:
+                        slug_chunks = leadership_chunks
+                LOGGER.info(
+                    "[RAG] direct slug fetch: slug=%s returned %d chunks",
+                    service_slug, len(slug_chunks),
+                )
+                answer = self._llm_service.answer_question(
+                    question,
+                    self._build_context(slug_chunks),
+                    chat_history,
+                )
+                return {
+                    "answer": answer or FALLBACK_RESPONSE,
+                    "sources": [
+                        {
+                            "chunk_id": c.chunk_id,
+                            "score": c.score,
+                            "metadata": c.metadata,
+                        }
+                        for c in slug_chunks
+                    ],
+                }
 
         query_embedding = self._embedding_service.embed_text(retrieval_query)
         search_results = self._vector_store.search(
@@ -124,49 +164,17 @@ class RAGService:
             top_k=self._retrieval_top_k,
         )
 
-        # Debug: show all raw results before any filtering
-        print(f"[DEBUG] raw results ({len(search_results)} chunks):")
-        for r in search_results:
-            src = r.metadata.get("url") or r.metadata.get("file_name", "?")
-            print(f"[DEBUG]   score={r.score:.4f}  url={src}")
-            print(f"[DEBUG]   preview: {r.content[:250]!r}")
-
         relevant_results = [
             r for r in search_results if r.score >= self._retrieval_min_score
         ]
-
-        # URL-based service boost: when the rewrite query names a specific service,
-        # prefer chunks from that service's page. Falls back to all relevant results
-        # if no matching chunks are found (e.g. page not yet ingested).
-        service_slug = _service_slug_for_query(retrieval_query)
-        if service_slug:
-            service_chunks = [
-                r for r in relevant_results
-                if service_slug in (r.metadata.get("url") or "")
-            ]
-            if service_chunks:
-                LOGGER.info(
-                    "[RAG] url-boost: slug=%s narrowed %d → %d chunks",
-                    service_slug, len(relevant_results), len(service_chunks),
-                )
-                print(
-                    f"[DEBUG] url-boost: slug={service_slug!r} "
-                    f"narrowed {len(relevant_results)} → {len(service_chunks)} chunks"
-                )
-                relevant_results = service_chunks
-            else:
-                LOGGER.info("[RAG] url-boost: slug=%s not found in results, keeping all", service_slug)
-                print(f"[DEBUG] url-boost: slug={service_slug!r} not found, keeping all results")
 
         if not relevant_results:
             LOGGER.info("[RAG] no results above min_score threshold")
             return {"answer": FALLBACK_RESPONSE, "sources": []}
 
-        print(f"[DEBUG] final chunks passed to LLM ({len(relevant_results)}):")
         for r in relevant_results:
             src = r.metadata.get("url") or r.metadata.get("file_name", "?")
             LOGGER.info("[RAG] retrieved: score=%.4f  source=%s", r.score, src)
-            print(f"[DEBUG]   score={r.score:.4f}  url={src}")
 
         context = self._build_context(relevant_results)
         # Original question goes to the answer prompt; the SLM rewrite was

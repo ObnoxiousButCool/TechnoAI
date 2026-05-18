@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.dependencies import get_rag_service
+from src.limiter import limiter
 from src.services import chat_memory
 
 LOGGER = logging.getLogger(__name__)
@@ -30,7 +31,8 @@ class ChatResponse(BaseModel):
 
 
 @router.post("", response_model=ChatResponse)
-def chat(payload: ChatRequest) -> ChatResponse:
+@limiter.limit("20/minute")
+def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     """Answer a question using the RAG pipeline, with optional session memory."""
 
     LOGGER.info("[chat] incoming session_id=%r", payload.session_id)
@@ -48,7 +50,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
         LOGGER.exception("Chat request failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to process chat request: {exc}",
+            detail="Something went wrong. Please try again.",
         ) from exc
 
     chat_memory.append_turn(session_id, payload.question, result["answer"])

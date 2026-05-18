@@ -29,8 +29,8 @@ def append_turn(session_id: str, question: str, answer: str) -> None:
     """Add a user/assistant turn to the session history."""
     if session_id not in _store:
         _store[session_id] = deque(maxlen=_MAX_TURNS)
-    _store[session_id].append(f"user asked: {question}")
-    _store[session_id].append(f"assistant responded: {answer}")
+    _store[session_id].append(f"User: {question}")
+    _store[session_id].append(f"Assistant: {answer}")
 
 
 def clear_session(session_id: str) -> bool:

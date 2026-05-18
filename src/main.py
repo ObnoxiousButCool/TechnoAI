@@ -10,14 +10,17 @@ from contextlib import asynccontextmanager
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from src.api.chat import router as chat_router
 from src.api.ingest import router as ingest_router
 from src.config.settings import get_settings
 from src.dependencies import get_vector_store
 from src.jobs.scheduler import Scheduler
+from src.limiter import limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,12 +47,15 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
+        allow_origins=allowed_origins,
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
     )
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.include_router(chat_router)
     app.include_router(ingest_router)
 

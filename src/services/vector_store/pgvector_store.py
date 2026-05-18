@@ -136,6 +136,30 @@ class PGVectorStore(VectorStore):
             for row in rows
         ]
 
+    def get_by_url(self, url_substring: str) -> list[SearchResult]:
+        """Return all chunks whose metadata url contains url_substring."""
+        with self._connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, content, metadata, 1.0 AS score
+                    FROM document_chunks
+                    WHERE metadata->>'url' LIKE %s
+                    ORDER BY id;
+                    """,
+                    (f"%{url_substring}%",),
+                )
+                rows = cursor.fetchall()
+        return [
+            SearchResult(
+                chunk_id=row["id"],
+                content=row["content"],
+                metadata=row["metadata"] or {},
+                score=1.0,
+            )
+            for row in rows
+        ]
+
     def delete(self, namespace: str) -> None:
         """Delete vectors for a given source identifier."""
 

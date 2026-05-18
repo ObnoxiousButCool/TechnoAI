@@ -1,29 +1,30 @@
 # Web framework
-# fastapi==0.116.1
+fastapi>=0.121.0,<1.0.0
 uvicorn[standard]==0.35.0
 
 # Data validation / settings
 pydantic==2.11.7
 pydantic-settings==2.10.1
 
+# HTTP client
+requests==2.33.0
 
-# HTTP client (Ollama calls, sitemap fetching)
-
-
-# Vector store — PostgreSQL + pgvector
+# Vector store
 pgvector==0.3.6
 psycopg[binary]==3.2.9
+numpy==1.26.4
 
-# Website crawler (JavaScript-rendered pages)
+# Rate limiting
+slowapi==0.1.9
+
+# Website crawler
 playwright==1.59.0
 
 # HTML parsing
 beautifulsoup4==4.13.4
 
-# PDF ingestion
-
-
+# Environment / config
 python-dotenv==1.2.2
-requests==2.33.0
+
+# PDF ingestion
 pypdf==6.10.2
-fastapi>=0.121.0

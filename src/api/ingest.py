@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
+from src.config.settings import get_settings
 from src.dependencies import get_ingestion_pipeline, get_vector_store
+
+_api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter(prefix="/ingest", tags=["ingestion"])
@@ -28,8 +32,11 @@ class ClearVectorStoreResponse(BaseModel):
 
 
 @router.post("/run", response_model=IngestResponse)
-def run_ingestion() -> IngestResponse:
+def run_ingestion(api_key: str | None = Security(_api_key_header)) -> IngestResponse:
     """Execute enabled ingestion sources."""
+
+    if api_key != get_settings().admin_api_key:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     try:
         pipeline = get_ingestion_pipeline()
@@ -39,13 +46,16 @@ def run_ingestion() -> IngestResponse:
         LOGGER.exception("Ingestion request failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to run ingestion: {exc}",
+            detail="Something went wrong. Please try again.",
         ) from exc
 
 
 @router.delete("/vectors", response_model=ClearVectorStoreResponse)
-def clear_vectors() -> ClearVectorStoreResponse:
+def clear_vectors(api_key: str | None = Security(_api_key_header)) -> ClearVectorStoreResponse:
     """Clear all previously ingested vector content."""
+
+    if api_key != get_settings().admin_api_key:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     try:
         deleted_count = get_vector_store().clear()
@@ -57,5 +67,5 @@ def clear_vectors() -> ClearVectorStoreResponse:
         LOGGER.exception("Vector store clear request failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to clear vector store: {exc}",
+            detail="Something went wrong. Please try again.",
         ) from exc

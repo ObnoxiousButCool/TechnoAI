@@ -48,6 +48,7 @@ def get_llm_service() -> LLMService:
     return LLMService(
         base_url=settings.ollama_base_url,
         model=settings.ollama_model,
+        rewrite_model=settings.ollama_rewrite_model,
         temperature=settings.ollama_temperature,
         top_p=settings.ollama_top_p,
         num_predict=settings.ollama_num_predict,
