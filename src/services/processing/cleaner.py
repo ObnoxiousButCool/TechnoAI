@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 STRIP_TAGS = (
     "script", "style", "nav", "footer", "header",
@@ -18,16 +18,20 @@ def clean_html(html: str) -> str:
         for node in soup.find_all(tag_name):
             node.decompose()
 
-    main = (
+    main_candidate = (
         soup.find("main")
         or soup.find("article")
         or soup.find(id="content")
         or soup.find(id="main")
-        or soup
+    )
+    target: Tag | BeautifulSoup = (
+        main_candidate
+        if isinstance(main_candidate, Tag)
+        else soup
     )
 
     segments = []
-    for node in main.find_all(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "td", "th", "blockquote"]):
+    for node in target.find_all(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "td", "th", "blockquote"]):
         text = node.get_text(separator=" ", strip=True)
         if text and len(text) > 8:
             segments.append(text)
@@ -40,7 +44,7 @@ def clean_html(html: str) -> str:
             deduped.append(s)
 
     if not deduped:
-        text = main.get_text(separator=" ", strip=True)
+        text = target.get_text(separator=" ", strip=True)
         return " ".join(text.split())
 
     return " | ".join(deduped)

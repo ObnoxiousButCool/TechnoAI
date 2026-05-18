@@ -110,7 +110,7 @@ class PGVectorStore(VectorStore):
 
     def search(self, embedding: list[float], top_k: int) -> list[SearchResult]:
         """Search vectors by cosine similarity."""
-        embedding = np.array(embedding)
+        embedding_vec: np.ndarray = np.array(embedding)
         query = """
             SELECT
                 id,
@@ -123,7 +123,7 @@ class PGVectorStore(VectorStore):
         """
         with self._connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(query, (embedding, embedding, top_k))
+                cursor.execute(query, (embedding_vec, embedding_vec, top_k))
                 rows = cursor.fetchall()
 
         return [

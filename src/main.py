@@ -9,11 +9,11 @@ from contextlib import asynccontextmanager
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
+    
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
-from slowapi import _rate_limit_exceeded_handler
+from starlette.responses import JSONResponse
 
 from src.api.chat import router as chat_router
 from src.api.ingest import router as ingest_router
@@ -55,7 +55,14 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please slow down."},
+        )
+
     app.include_router(chat_router)
     app.include_router(ingest_router)
 

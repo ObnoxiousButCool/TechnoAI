@@ -49,3 +49,8 @@ class VectorStore(ABC):
     @abstractmethod
     def clear(self) -> int:
         """Delete every vector from the store and return the deleted count."""
+
+    @abstractmethod
+    def get_by_url(self, url_substring: str) -> list[SearchResult]:
+        """Return all chunks whose metadata url contains url_substring."""
+        ...
