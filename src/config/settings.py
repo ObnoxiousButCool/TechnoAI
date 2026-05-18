@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
-    admin_api_key: str = Field(alias="ADMIN_API_KEY")
+    admin_api_key: str = Field(
+    default="dev-key",
+    alias="ADMIN_API_KEY",
+)
     allowed_origins: str = Field(
         default="http://localhost:3000,http://localhost:5173",
         alias="ALLOWED_ORIGINS",
