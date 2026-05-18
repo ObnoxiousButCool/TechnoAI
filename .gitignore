@@ -5,3 +5,4 @@ Dockerfile
 .venv
 chroma_db/
 local.py
+techev/
