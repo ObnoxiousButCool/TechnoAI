@@ -147,13 +147,6 @@ class LLMService:
         chat_history: list[str] | None = None,
     ) -> list[str]:
         """Generate 2-3 contextually relevant follow-up suggestions."""
-        history_text = ""
-        if chat_history:
-            history_text = (
-                "Conversation so far:\n"
-                + "\n".join(chat_history)
-                + "\n\n"
-            )
         prompt = (
             "You generate follow-up suggestions for the "
             "Technossus website chatbot.\n\n"
