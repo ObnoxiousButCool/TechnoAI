@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 
+import httpx
 import requests
 
 LOGGER = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ class LLMService:
         self._top_p = top_p
         self._num_predict = num_predict
 
-    def answer_question(
+    async def answer_question(
         self,
         question: str,
         context: str,
@@ -117,33 +118,32 @@ class LLMService:
         )
 
         try:
-            response = requests.post(
-                f"{self._base_url}/api/generate",
-                json={
-                    "model": self._model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": self._temperature,
-                        "top_p": self._top_p,
-                        "num_predict": self._num_predict,
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self._base_url}/api/generate",
+                    json={
+                        "model": self._model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": self._temperature,
+                            "top_p": self._top_p,
+                            "num_predict": self._num_predict,
+                        },
                     },
-                },
-                timeout=120,
-            )
-
-            response.raise_for_status()
-            data = response.json()
-
-            return _fix_encoding(data.get("response", "").strip())
+                    timeout=120,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return _fix_encoding(data.get("response", "").strip())
         except Exception as exc:
             LOGGER.error("[LLM] answer_question failed: %s", exc)
             return "I'm having trouble connecting right now. Please try again in a moment."
 
-    def generate_follow_ups(
+    async def generate_follow_ups(
         self,
         question: str,
-        answer: str,
+        context: str,
         chat_history: list[str] | None = None,
     ) -> list[str]:
         """Generate 2-3 contextually relevant follow-up suggestions."""
@@ -155,43 +155,58 @@ class LLMService:
                 + "\n\n"
             )
         prompt = (
-            "You are generating follow-up question suggestions for "
-            "a chatbot on the Technossus website.\n\n"
-            f"{history_text}"
-            f"The user just asked: {question}\n"
-            f"The assistant just answered: {answer}\n\n"
-            "Generate exactly 3 short follow-up questions a user "
-            "might naturally ask next. Each must be:\n"
-            "- Directly related to what was just discussed\n"
-            "- Phrased as something the user would type\n"
-            "- Under 10 words\n"
-            "- Varied — don't repeat the same topic\n\n"
-            "Return only a JSON array of 3 strings. "
-            "No explanation. No markdown. Example format:\n"
-            '["Question one?", "Question two?", "Question three?"]\n\n'
+            "You generate follow-up suggestions for the "
+            "Technossus website chatbot.\n\n"
+            "The user asked: " + question + "\n\n"
+            "The website content used to answer was:\n"
+            + context[:800] + "\n\n"
+            "Generate 3 follow-up questions. Each must:\n"
+            "1. Be answerable from the website content above "
+            "— only ask about topics, services, or companies "
+            "explicitly named in the content\n"
+            "2. Be broad — ask about a service area, industry, "
+            "or company topic, NOT about specific details, "
+            "numbers, or how something was done\n"
+            "3. Be about Technossus offerings, not about the "
+            "user's situation\n"
+            "4. Be under 10 words\n\n"
+            "NEVER ask about: specific metrics, technical "
+            "details of how something worked, names of systems "
+            "used, or anything not in the content above.\n\n"
+            "GOOD examples: 'What industries do you serve?', "
+            "'Tell me about healthcare services.', "
+            "'Do you work with financial services?'\n\n"
+            "BAD examples: 'What was the platform built with?', "
+            "'How did the CRM handle data?', "
+            "'What were the specific results?'\n\n"
+            "IMPORTANT: Do not suggest the question that was just "
+            "asked. The user already asked: " + question + "\n\n"
+            "Return ONLY a JSON array of 3 strings. "
+            "No explanation, no markdown.\n"
             "JSON array:"
         )
         try:
-            response = requests.post(
-                f"{self._base_url}/api/generate",
-                json={
-                    "model": self._rewrite_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.4,
-                        "num_predict": 80,
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self._base_url}/api/generate",
+                    json={
+                        "model": self._rewrite_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.4,
+                            "num_predict": 80,
+                        },
                     },
-                },
-                timeout=15,
-            )
-            response.raise_for_status()
-            raw = response.json().get("response", "").strip()
-            raw = raw.strip("```json").strip("```").strip()
-            parsed = json.loads(raw)
-            if isinstance(parsed, list):
-                return [_fix_encoding(str(s)) for s in parsed[:3]]
-            return []
+                    timeout=15,
+                )
+                response.raise_for_status()
+                raw = response.json().get("response", "").strip()
+                raw = raw.strip("```json").strip("```").strip()
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [_fix_encoding(str(s)) for s in parsed[:3]]
+                return []
         except Exception as exc:
             LOGGER.warning("[LLM] follow_ups generation failed: %s", exc)
             return []

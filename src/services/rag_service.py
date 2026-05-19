@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -26,12 +27,6 @@ _CANONICAL_SERVICES = [
     "Product Engineering",
     "Quality Engineering",
 ]
-
-_SERVICE_OVERVIEW_ANSWER = (
-    "At Technossus, we offer six core service areas:\n\n"
-    + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(_CANONICAL_SERVICES))
-    + "\n\nWould you like me to go deeper into any of these?"
-)
 
 # Matches common ways a user asks for the services list
 _SERVICE_OVERVIEW_RE = re.compile(
@@ -109,15 +104,53 @@ class RAGService:
         self._retrieval_top_k = retrieval_top_k
         self._retrieval_min_score = retrieval_min_score
 
-    def answer(self, question: str, chat_history: list[str] | None = None) -> dict:
+    async def answer(self, question: str, chat_history: list[str] | None = None) -> dict:
         """Run the RAG pipeline and return the assistant answer."""
 
-        # Deterministic intercept — always consistent, no LLM needed.
-        if _is_service_overview(question):
-            LOGGER.info("[RAG] service overview intercept")
-            return {"answer": _SERVICE_OVERVIEW_ANSWER, "sources": [], "follow_ups": []}
-
         history = chat_history or []
+
+        if _is_service_overview(question):
+            LOGGER.info("[RAG] service overview — fetching all service chunks")
+            service_slugs = [
+                "ai-business-transformation",
+                "cloud-product-modernization",
+                "data-intelligence-analytics",
+                "digital-experience-design",
+                "product-engineering",
+                "quality-engineering",
+            ]
+            overview_chunks = []
+            for slug in service_slugs:
+                chunks = self._vector_store.get_by_url(slug)
+                if chunks:
+                    overview_chunks.append(chunks[0])
+
+            if overview_chunks:
+                context = self._build_context(overview_chunks)
+                answer_text, follow_ups = await asyncio.gather(
+                    self._llm_service.answer_question(
+                        question,
+                        context,
+                        history,
+                    ),
+                    self._llm_service.generate_follow_ups(
+                        question,
+                        context,
+                        history,
+                    ),
+                )
+                return {
+                    "answer": answer_text or FALLBACK_RESPONSE,
+                    "sources": [
+                        {
+                            "chunk_id": c.chunk_id,
+                            "score": c.score,
+                            "metadata": c.metadata,
+                        }
+                        for c in overview_chunks
+                    ],
+                    "follow_ups": follow_ups,
+                }
 
         LOGGER.info("[RAG] user message: %r", question)
 
@@ -148,18 +181,22 @@ class RAGService:
                     "[RAG] direct slug fetch: slug=%s returned %d chunks",
                     service_slug, len(slug_chunks),
                 )
-                answer = self._llm_service.answer_question(
-                    question,
-                    self._build_context(slug_chunks),
-                    chat_history,
+                slug_context = self._build_context(slug_chunks)
+                answer_text, follow_ups = await asyncio.gather(
+                    self._llm_service.answer_question(
+                        question,
+                        slug_context,
+                        history,
+                    ),
+                    self._llm_service.generate_follow_ups(
+                        question,
+                        slug_context,
+                        history,
+                    ),
                 )
-                follow_ups = self._llm_service.generate_follow_ups(
-                    question,
-                    answer or FALLBACK_RESPONSE,
-                    history,
-                )
+                answer = answer_text or FALLBACK_RESPONSE
                 return {
-                    "answer": answer or FALLBACK_RESPONSE,
+                    "answer": answer,
                     "sources": [
                         {
                             "chunk_id": c.chunk_id,
@@ -193,18 +230,19 @@ class RAGService:
         # Original question goes to the answer prompt; the SLM rewrite was
         # retrieval-only. Chat history gives the LLM enough context to understand
         # what the user meant by vague follow-ups.
-        answer = self._llm_service.answer_question(
-            question=question,
-            context=context,
-            chat_history=chat_history,
+        answer_text, follow_ups = await asyncio.gather(
+            self._llm_service.answer_question(
+                question=question,
+                context=context,
+                chat_history=history,
+            ),
+            self._llm_service.generate_follow_ups(
+                question,
+                context,
+                history,
+            ),
         )
-        if not answer:
-            answer = FALLBACK_RESPONSE
-        follow_ups = self._llm_service.generate_follow_ups(
-            question,
-            answer,
-            history,
-        )
+        answer = answer_text or FALLBACK_RESPONSE
         return {
             "answer": answer,
             "sources": [

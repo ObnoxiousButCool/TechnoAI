@@ -33,7 +33,7 @@ class ChatResponse(BaseModel):
 
 @router.post("", response_model=ChatResponse)
 @limiter.limit("20/minute")
-def chat(request: Request, payload: ChatRequest) -> ChatResponse:
+async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     """Answer a question using the RAG pipeline, with optional session memory."""
 
     LOGGER.info("[chat] incoming session_id=%r", payload.session_id)
@@ -43,7 +43,7 @@ def chat(request: Request, payload: ChatRequest) -> ChatResponse:
 
     try:
         rag_service = get_rag_service()
-        result = rag_service.answer(
+        result = await rag_service.answer(
             question=payload.question,
             chat_history=history or None,
         )
