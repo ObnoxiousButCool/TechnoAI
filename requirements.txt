@@ -18,6 +18,9 @@ numpy==1.26.4
 # Rate limiting
 slowapi==0.1.9
 
+# File uploads
+python-multipart>=0.0.9
+
 # Website crawler
 playwright==1.59.0
 

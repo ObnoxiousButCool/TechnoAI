@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     ollama_top_p: float = Field(default=0.8, alias="OLLAMA_TOP_P")
     ollama_num_predict: int = Field(default=180, alias="OLLAMA_NUM_PREDICT")
 
+    # Media / file uploads
+    media_root: str = Field(default="./media", alias="MEDIA_ROOT")
+    media_url: str = Field(default="/media", alias="MEDIA_URL")
+    max_upload_bytes: int = Field(default=5 * 1024 * 1024, alias="MAX_UPLOAD_BYTES")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
