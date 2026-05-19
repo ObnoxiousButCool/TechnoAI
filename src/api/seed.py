@@ -8,7 +8,6 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security.api_key import APIKeyHeader
 
 from src.config.settings import get_settings
 from src.services.content_service import ContentService
@@ -16,17 +15,8 @@ from src.services.content_service import ContentService
 LOGGER = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-_admin_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
-
-
 def _get_service() -> ContentService:
     return ContentService(get_settings().database_url)
-
-
-def _require_admin(x_admin_key: str | None = Depends(_admin_key_header)) -> None:
-    settings = get_settings()
-    if not x_admin_key or x_admin_key != settings.admin_api_key:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 # ── Asset constants (same as the frontend) ────────────────────────────────────
@@ -1142,7 +1132,6 @@ SEED_VERSION: str = hashlib.sha256(
         "admin edits) are never overwritten. Each run is recorded in the seed_log table. "
         "Requires X-Admin-Key header."
     ),
-    dependencies=[Depends(_require_admin)],
 )
 def seed(service: ContentService = Depends(_get_service)) -> dict:
     """Seed the database with static content. Skips slugs already present."""

@@ -373,6 +373,8 @@ class ContentService:
         """
         row = dict(data)
         row.setdefault("id", str(uuid.uuid4()))
+        row.setdefault("impact_context_label", None)
+        row.setdefault("impact_context_body", None)
         for field in _JSONB_FIELDS_CASE_STUDY:
             if field in row and not isinstance(row[field], Jsonb):
                 row[field] = Jsonb(row[field])
