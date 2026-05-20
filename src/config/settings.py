@@ -67,6 +67,16 @@ class Settings(BaseSettings):
     ollama_top_p: float = Field(default=0.8, alias="OLLAMA_TOP_P")
     ollama_num_predict: int = Field(default=180, alias="OLLAMA_NUM_PREDICT")
 
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    groq_answer_model: str = Field(
+        default="meta-llama/llama-4-scout-17b-16e-instruct",
+        alias="GROQ_ANSWER_MODEL",
+    )
+    groq_rewrite_model: str = Field(
+        default="llama-3.1-8b-instant",
+        alias="GROQ_REWRITE_MODEL",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

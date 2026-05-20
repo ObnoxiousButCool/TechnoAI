@@ -1,4 +1,4 @@
-﻿"""LLM response generation constrained to retrieved context using Ollama."""
+"""LLM response generation constrained to retrieved context using Groq."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ LOGGER = logging.getLogger(__name__)
 
 def _fix_encoding(text: str) -> str:
     return (
-        text.replace("â", "'")
-            .replace("â", '"')
-            .replace("â", '"')
+        text.replace("â", "'")
+            .replace("â", '"')
+            .replace("â", '"')
     )
 
 
@@ -52,20 +52,13 @@ Banned phrases — never use these:
 - furthermore
 
 Format rules:
-- Answer in 60-200 words. For questions that require listing multiple items (people,
-  services, case studies), use as many words as needed to cover all items completely.
-  Never truncate a list.
-- Use markdown where it improves readability.
-- Use **bold** for names, service names, and key terms worth highlighting.
-- Use hyphen bullet points when listing 3 or more items. Never use numbered lists.
-- Never mix prose and bullets for the same type of content. If you start listing people,
-  services, or case studies as bullets, list ALL of them as bullets — do not put some in
-  prose and others in bullets.
-- Each bullet must cover exactly one item (one person, one service, one case study).
-- Add a blank line between paragraphs.
-- Never use headers (# or ##).
-- For service overview questions: list all services as hyphen bullets, one per line.
-- For follow-up questions: answer only the one referenced item in prose or bullets as appropriate.
+- Answer in 60-90 words. Be concise.
+- Plain text only. No markdown of any kind.
+- Never use *, **, #, or any markdown symbol.
+- Never number a list. Use only hyphen bullets if a list is needed.
+- For service overview questions: maximum 6 hyphen bullets.
+- For follow-up questions: answer only the one referenced item,
+  60-90 words, plain text.
 - Do not end with a question. Never append a follow-up question to your answer. Follow-up suggestions are handled separately.
 
 If you are ever unsure whether the content supports your answer,
@@ -75,23 +68,28 @@ better than a plausible-sounding fabrication.\
 
 
 class LLMService:
-    """Wrap Ollama generation with strict grounding instructions."""
+    """Wrap Groq generation with strict grounding instructions."""
 
     def __init__(
         self,
-        base_url: str,
-        model: str,
+        groq_api_key: str,
+        answer_model: str,
         rewrite_model: str,
         temperature: float,
         top_p: float,
         num_predict: int,
     ) -> None:
-        self._base_url = base_url
-        self._model = model
+        self._api_key = groq_api_key
+        self._answer_model = answer_model
         self._rewrite_model = rewrite_model
         self._temperature = temperature
         self._top_p = top_p
         self._num_predict = num_predict
+        self._base_url = "https://api.groq.com/openai/v1"
+        self._headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
 
     async def answer_question(
         self,
@@ -105,19 +103,17 @@ class LLMService:
         if chat_history:
             history_block = "Conversation history:\n" + "\n".join(chat_history) + "\n\n"
 
-        prompt = (
-            f"{_SYSTEM_PROMPT}\n\n"
+        user_message = (
             f"{history_block}"
             f"Website content:\n{context}\n\n"
             "CRITICAL FORMAT ENFORCEMENT:\n"
-            "- Use markdown: **bold** for key terms, hyphen "
-            "bullets for lists of 3+ items.\n"
-            "- Never use numbered lists or headers.\n"
-            "- Do not repeat yourself — say each thing once.\n"
-            "- Add blank lines between paragraphs.\n"
-            "- No strict word limit for list-based answers. "
-            "Cover all items completely. For prose answers "
-            "stay under 120 words.\n"
+            "- Plain text only. No markdown.\n"
+            "- Never use **, *, #, or any markdown symbol.\n"
+            "- Do not repeat yourself. Say each thing once.\n"
+            "- If listing items, use ONLY hyphen bullets.\n"
+            "- Do not write a prose sentence AND then repeat "
+            "the same items as bullets. Choose one format.\n"
+            "- Maximum 90 words total.\n"
             "- Do not start your answer with 'At Technossus'.\n\n"
             f"Question: {question}\n"
             "Answer:"
@@ -126,22 +122,23 @@ class LLMService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
-                        "model": self._model,
-                        "prompt": prompt,
+                        "model": self._answer_model,
+                        "messages": [
+                            {"role": "system", "content": _SYSTEM_PROMPT},
+                            {"role": "user", "content": user_message},
+                        ],
+                        "temperature": self._temperature,
+                        "max_tokens": self._num_predict,
                         "stream": False,
-                        "options": {
-                            "temperature": self._temperature,
-                            "top_p": self._top_p,
-                            "num_predict": self._num_predict,
-                        },
                     },
-                    timeout=120,
+                    timeout=60,
                 )
                 response.raise_for_status()
                 data = response.json()
-                return _fix_encoding(data.get("response", "").strip())
+                return _fix_encoding(data["choices"][0]["message"]["content"].strip())
         except Exception as exc:
             LOGGER.error("[LLM] answer_question failed: %s", exc)
             return "I'm having trouble connecting right now. Please try again in a moment."
@@ -154,65 +151,55 @@ class LLMService:
     ) -> list[str]:
         """Generate 2-3 contextually relevant follow-up suggestions."""
         prompt = (
-            "You generate follow-up topic chips for the "
-            "Technossus website chatbot. These are short "
-            "labels users click to explore related topics.\n\n"
-            "The user just asked: " + question + "\n\n"
+            "You generate follow-up suggestions for the "
+            "Technossus website chatbot.\n\n"
+            "The user asked: " + question + "\n\n"
             "The website content used to answer was:\n"
             + context[:800] + "\n\n"
-            "Generate exactly 3 follow-up topic chips.\n\n"
-            "Rules:\n"
-            "1. Each chip must be a natural next thing the "
-            "user would want to explore after this answer\n"
-            "2. 2-5 words maximum\n"
-            "3. Must relate to Technossus services, "
-            "industries, case studies, or leadership\n"
-            "4. Each chip covers a different topic\n"
-            "5. No question marks or punctuation\n"
-            "6. Sound like something a user would click, "
-            "not a tagline or internal term\n"
-            "7. Never suggest a chip that repeats or closely "
-            "rephrases what the user just asked. The user "
-            "just asked: " + question + " — do not suggest "
-            "anything similar to this.\n\n"
-            "Context-specific guidance:\n"
-            "- After a services answer → suggest specific "
-            "service deep-dives or industries served\n"
-            "- After a leadership answer → suggest a "
-            "specific leader, case studies, or services\n"
-            "- After a case study answer → suggest another "
-            "industry, a specific service, or contact\n"
-            "- After a contact answer → suggest services "
-            "or case studies\n\n"
-            "GOOD examples for a services question:\n"
-            "[\"AI transformation\", \"Healthcare work\", "
-            "\"Case studies\"]\n\n"
-            "GOOD examples for a leadership question:\n"
-            "[\"Kumar Gaurav\", \"Our case studies\", "
-            "\"AI services\"]\n\n"
-            "BAD examples: [\"Accelerate Vision\", "
-            "\"Strategy Technology Execution\", "
-            "\"Investment Accountability\"]\n\n"
-            "Return ONLY a JSON array of 3 strings.\n"
+            "Generate 3 follow-up questions. Each must:\n"
+            "1. Be answerable from the website content above "
+            "— only ask about topics, services, or companies "
+            "explicitly named in the content\n"
+            "2. Be broad — ask about a service area, industry, "
+            "or company topic, NOT about specific details, "
+            "numbers, or how something was done\n"
+            "3. Be about Technossus offerings, not about the "
+            "user's situation\n"
+            "4. Be under 10 words\n\n"
+            "NEVER ask about: specific metrics, technical "
+            "details of how something worked, names of systems "
+            "used, or anything not in the content above.\n\n"
+            "GOOD examples: 'What industries do you serve?', "
+            "'Tell me about healthcare services.', "
+            "'Do you work with financial services?'\n\n"
+            "BAD examples: 'What was the platform built with?', "
+            "'How did the CRM handle data?', "
+            "'What were the specific results?'\n\n"
+            "IMPORTANT: Do not suggest the question that was just "
+            "asked. The user already asked: " + question + "\n\n"
+            "Return ONLY a JSON array of 3 strings. "
+            "No explanation, no markdown.\n"
             "JSON array:"
         )
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
                         "model": self._rewrite_model,
-                        "prompt": prompt,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.4,
+                        "max_tokens": 100,
                         "stream": False,
-                        "options": {
-                            "temperature": 0.4,
-                            "num_predict": 80,
-                        },
                     },
-                    timeout=15,
+                    timeout=30,
                 )
                 response.raise_for_status()
-                raw = response.json().get("response", "").strip()
+                data = response.json()
+                raw = data["choices"][0]["message"]["content"].strip()
                 raw = raw.strip("```json").strip("```").strip()
                 parsed = json.loads(raw)
                 if isinstance(parsed, list):
@@ -256,20 +243,22 @@ class LLMService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
                         "model": self._rewrite_model,
-                        "prompt": prompt,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 50,
                         "stream": False,
-                        "options": {
-                            "temperature": 0.0,
-                            "num_predict": 50,
-                        },
                     },
                     timeout=30,
                 )
             response.raise_for_status()
-            result = response.json().get("response", "").strip()
+            data = response.json()
+            result = data["choices"][0]["message"]["content"].strip()
             # Take only the first line and strip stray quotes/backticks
             result = result.split("\n")[0].strip().strip("\"'`")
             return result or None
