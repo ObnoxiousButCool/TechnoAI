@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from src.config.settings import get_settings
 from src.services.crawler.sitemap_crawler import SitemapCrawler
 from src.services.embeddings.embedding_service import EmbeddingService
@@ -32,13 +34,14 @@ def get_vector_store() -> VectorStore:
     )
 
 
+@lru_cache(maxsize=1)
 def get_embedding_service() -> EmbeddingService:
     """Build the embedding service."""
 
     settings = get_settings()
     return EmbeddingService(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_embedding_model,
+        api_key=settings.nomic_api_key,
+        model=settings.nomic_embedding_model,
     )
 
 

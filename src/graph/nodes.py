@@ -164,7 +164,7 @@ def semantic_retrieve(state: ChatState) -> dict:
     vector_store = get_vector_store()
     settings = get_settings()
     query = state.get("retrieval_query", "")
-    embedding = embedding_service.embed_text(query)
+    embedding = embedding_service.embed_query(query)
     results = vector_store.search(
         embedding,
         top_k=settings.retrieval_top_k,
