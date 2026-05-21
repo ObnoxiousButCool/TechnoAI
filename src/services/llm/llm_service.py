@@ -52,13 +52,20 @@ Banned phrases — never use these:
 - furthermore
 
 Format rules:
-- Answer in 60-90 words. Be concise.
-- Plain text only. No markdown of any kind.
-- Never use *, **, #, or any markdown symbol.
-- Never number a list. Use only hyphen bullets if a list is needed.
-- For service overview questions: maximum 6 hyphen bullets.
-- For follow-up questions: answer only the one referenced item,
-  60-90 words, plain text.
+- Answer in 60-200 words. For questions that require listing multiple items (people,
+  services, case studies), use as many words as needed to cover all items completely.
+  Never truncate a list.
+- Use markdown where it improves readability.
+- Use **bold** for names, service names, and key terms worth highlighting.
+- Use hyphen bullet points when listing 3 or more items. Never use numbered lists.
+- Never mix prose and bullets for the same type of content. If you start listing people,
+  services, or case studies as bullets, list ALL of them as bullets — do not put some in
+  prose and others in bullets.
+- Each bullet must cover exactly one item (one person, one service, one case study).
+- Add a blank line between paragraphs.
+- Never use headers (# or ##).
+- For service overview questions: list all services as hyphen bullets, one per line.
+- For follow-up questions: answer only the one referenced item in prose or bullets as appropriate.
 - Do not end with a question. Never append a follow-up question to your answer. Follow-up suggestions are handled separately.
 
 If you are ever unsure whether the content supports your answer,
@@ -102,16 +109,16 @@ class LLMService:
             f"{_SYSTEM_PROMPT}\n\n"
             f"{history_block}"
             f"Website content:\n{context}\n\n"
-            "CRITICAL GROUNDING INSTRUCTION:\n"
-            "Your answer must be built EXCLUSIVELY from the Website "
-            "content section above. Every service name, statistic, "
-            "percentage, and detail must appear word-for-word in that "
-            "content. If a service name in your answer does not appear "
-            "in the Website content above, you are hallucinating — "
-            "stop and use the fallback message instead.\n"
-            "Fallback message: I can help with questions based on "
-            "Technossus website content. You can ask about our services, "
-            "industries, case studies, leadership, or AI capabilities.\n\n"
+            "CRITICAL FORMAT ENFORCEMENT:\n"
+            "- Use markdown: **bold** for key terms, hyphen "
+            "bullets for lists of 3+ items.\n"
+            "- Never use numbered lists or headers.\n"
+            "- Do not repeat yourself — say each thing once.\n"
+            "- Add blank lines between paragraphs.\n"
+            "- No strict word limit for list-based answers. "
+            "Cover all items completely. For prose answers "
+            "stay under 120 words.\n"
+            "- Do not start your answer with 'At Technossus'.\n\n"
             f"Question: {question}\n"
             "Answer:"
         )
@@ -147,34 +154,46 @@ class LLMService:
     ) -> list[str]:
         """Generate 2-3 contextually relevant follow-up suggestions."""
         prompt = (
-            "You generate follow-up suggestions for the "
-            "Technossus website chatbot.\n\n"
-            "The user asked: " + question + "\n\n"
+            "You generate follow-up topic chips for the "
+            "Technossus website chatbot. These are short "
+            "labels users click to explore related topics.\n\n"
+            "The user just asked: " + question + "\n\n"
             "The website content used to answer was:\n"
             + context[:800] + "\n\n"
-            "Generate 3 follow-up questions. Each must:\n"
-            "1. Be answerable from the website content above "
-            "— only ask about topics, services, or companies "
-            "explicitly named in the content\n"
-            "2. Be broad — ask about a service area, industry, "
-            "or company topic, NOT about specific details, "
-            "numbers, or how something was done\n"
-            "3. Be about Technossus offerings, not about the "
-            "user's situation\n"
-            "4. Be under 10 words\n\n"
-            "NEVER ask about: specific metrics, technical "
-            "details of how something worked, names of systems "
-            "used, or anything not in the content above.\n\n"
-            "GOOD examples: 'What industries do you serve?', "
-            "'Tell me about healthcare services.', "
-            "'Do you work with financial services?'\n\n"
-            "BAD examples: 'What was the platform built with?', "
-            "'How did the CRM handle data?', "
-            "'What were the specific results?'\n\n"
-            "IMPORTANT: Do not suggest the question that was just "
-            "asked. The user already asked: " + question + "\n\n"
-            "Return ONLY a JSON array of 3 strings. "
-            "No explanation, no markdown.\n"
+            "Generate exactly 3 follow-up topic chips.\n\n"
+            "Rules:\n"
+            "1. Each chip must be a natural next thing the "
+            "user would want to explore after this answer\n"
+            "2. 2-5 words maximum\n"
+            "3. Must relate to Technossus services, "
+            "industries, case studies, or leadership\n"
+            "4. Each chip covers a different topic\n"
+            "5. No question marks or punctuation\n"
+            "6. Sound like something a user would click, "
+            "not a tagline or internal term\n"
+            "7. Never suggest a chip that repeats or closely "
+            "rephrases what the user just asked. The user "
+            "just asked: " + question + " — do not suggest "
+            "anything similar to this.\n\n"
+            "Context-specific guidance:\n"
+            "- After a services answer → suggest specific "
+            "service deep-dives or industries served\n"
+            "- After a leadership answer → suggest a "
+            "specific leader, case studies, or services\n"
+            "- After a case study answer → suggest another "
+            "industry, a specific service, or contact\n"
+            "- After a contact answer → suggest services "
+            "or case studies\n\n"
+            "GOOD examples for a services question:\n"
+            "[\"AI transformation\", \"Healthcare work\", "
+            "\"Case studies\"]\n\n"
+            "GOOD examples for a leadership question:\n"
+            "[\"Kumar Gaurav\", \"Our case studies\", "
+            "\"AI services\"]\n\n"
+            "BAD examples: [\"Accelerate Vision\", "
+            "\"Strategy Technology Execution\", "
+            "\"Investment Accountability\"]\n\n"
+            "Return ONLY a JSON array of 3 strings.\n"
             "JSON array:"
         )
         try:
