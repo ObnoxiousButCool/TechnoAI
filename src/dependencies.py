@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from typing import TYPE_CHECKING
+
 from src.config.settings import get_settings
+
+if TYPE_CHECKING:
+    from src.services.vector_store.azure_search_store import AzureSearchVectorStore
 from src.services.crawler.sitemap_crawler import SitemapCrawler
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.ingestion.file_ingestor import FileIngestor
@@ -12,23 +18,33 @@ from src.services import chat_memory as _chat_memory_module
 from src.services.llm.llm_service import LLMService
 from src.services.rag_service import RAGService
 from src.services.vector_store.base import VectorStore
-from src.services.vector_store.pgvector_store import PGVectorStore
 
 
+@lru_cache(maxsize=1)
 def get_vector_store() -> VectorStore:
-    """Build the configured vector store.
-
-    Reads VECTOR_STORE_TYPE from settings.  Currently only "pgvector" is
-    supported; the ChromaDB path has been removed.
-    """
-
+    from src.services.vector_store.azure_search_store import (
+        AzureSearchVectorStore,
+    )
     settings = get_settings()
-    store_type = settings.vector_store_type.lower()
-    if store_type == "pgvector":
-        return PGVectorStore(database_url=settings.database_url)
-    raise ValueError(
-        f"Unsupported VECTOR_STORE_TYPE '{store_type}'. "
-        "Set VECTOR_STORE_TYPE=pgvector in your .env file."
+    return AzureSearchVectorStore(
+        endpoint=settings.azure_search_endpoint,
+        api_key=settings.azure_search_key,
+        index_name=settings.azure_search_index,
+        vector_size=settings.embedding_dimensions,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_azure_search_store() -> "AzureSearchVectorStore":
+    from src.services.vector_store.azure_search_store import (
+        AzureSearchVectorStore,
+    )
+    settings = get_settings()
+    return AzureSearchVectorStore(
+        endpoint=settings.azure_search_endpoint,
+        api_key=settings.azure_search_key,
+        index_name=settings.azure_search_index,
+        vector_size=settings.embedding_dimensions,
     )
 
 

@@ -67,6 +67,20 @@ class Settings(BaseSettings):
     ollama_top_p: float = Field(default=0.8, alias="OLLAMA_TOP_P")
     ollama_num_predict: int = Field(default=180, alias="OLLAMA_NUM_PREDICT")
 
+    azure_search_endpoint: str = Field(
+        default="", alias="AZURE_SEARCH_ENDPOINT"
+    )
+    azure_search_key: str = Field(
+        default="", alias="AZURE_SEARCH_KEY"
+    )
+    azure_search_index: str = Field(
+        default="technossus-chunks",
+        alias="AZURE_SEARCH_INDEX",
+    )
+    azure_postgres_url: str = Field(
+        default="", alias="AZURE_POSTGRES_URL"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

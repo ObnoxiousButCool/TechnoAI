@@ -116,12 +116,19 @@ async def initialise_graph(database_url: str) -> None:
     from psycopg.rows import dict_row
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from psycopg_pool import AsyncConnectionPool
+    from src.config.settings import get_settings
+
+    settings = get_settings()
+    db_url = (
+        settings.azure_postgres_url
+        or get_settings().database_url
+    )
 
     # Run setup() on a direct connection with autocommit=True
     # because CREATE INDEX CONCURRENTLY cannot run inside
     # a transaction block (which the pool creates by default)
     async with await psycopg.AsyncConnection.connect(
-        database_url,
+        db_url,
         autocommit=True,
         row_factory=dict_row,
     ) as conn:
@@ -130,7 +137,7 @@ async def initialise_graph(database_url: str) -> None:
 
     # Now create the pool for runtime use
     pool: AsyncConnectionPool[psycopg.AsyncConnection[dict[str, Any]]] = AsyncConnectionPool(
-        conninfo=database_url,
+        conninfo=db_url,
         max_size=10,
         min_size=1,
         open=False,
