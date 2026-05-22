@@ -77,6 +77,14 @@ class Settings(BaseSettings):
         alias="GROQ_REWRITE_MODEL",
     )
 
+    nomic_api_key: str = Field(
+        default="", alias="NOMIC_API_KEY"
+    )
+    nomic_embedding_model: str = Field(
+        default="nomic-embed-text-v1.5",
+        alias="NOMIC_EMBEDDING_MODEL",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
