@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 
@@ -27,6 +28,19 @@ from src.services.vector_store.base import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _encode_key(key: str) -> str:
+    """Encode a chunk_id to a valid Azure Search key."""
+    return base64.urlsafe_b64encode(key.encode()).decode().rstrip("=")
+
+
+def _decode_key(encoded: str) -> str:
+    """Decode an Azure Search key back to chunk_id."""
+    padding = 4 - len(encoded) % 4
+    if padding != 4:
+        encoded += "=" * padding
+    return base64.urlsafe_b64decode(encoded.encode()).decode()
 
 
 class AzureSearchVectorStore(VectorStore):
@@ -135,7 +149,7 @@ class AzureSearchVectorStore(VectorStore):
             return
         documents = [
             {
-                "chunk_id": r.chunk_id,
+                "chunk_id": _encode_key(r.chunk_id),
                 "source_id": r.source_id,
                 "source_type": r.source_type,
                 "content": r.content,
@@ -173,7 +187,7 @@ class AzureSearchVectorStore(VectorStore):
             metadata = json.loads(r.get("metadata_json") or "{}")
             output.append(
                 SearchResult(
-                    chunk_id=r["chunk_id"],
+                    chunk_id=_decode_key(r["chunk_id"]),
                     content=r["content"],
                     metadata=metadata,
                     score=r["@search.score"],
@@ -197,7 +211,7 @@ class AzureSearchVectorStore(VectorStore):
             if url_substring in url:
                 output.append(
                     SearchResult(
-                        chunk_id=r["chunk_id"],
+                        chunk_id=_decode_key(r["chunk_id"]),
                         content=r["content"],
                         metadata=metadata,
                         score=1.0,

@@ -1,4 +1,4 @@
-﻿"""LLM response generation constrained to retrieved context using Ollama."""
+"""LLM response generation — supports Ollama (dev) and Groq (test/prod)."""
 
 from __future__ import annotations
 
@@ -9,12 +9,14 @@ import httpx
 
 LOGGER = logging.getLogger(__name__)
 
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
 
 def _fix_encoding(text: str) -> str:
     return (
-        text.replace("â", "'")
-            .replace("â", '"')
-            .replace("â", '"')
+        text.replace("â", "'")
+            .replace("â", '"')
+            .replace("â", '"')
     )
 
 
@@ -73,25 +75,96 @@ default to the fallback message above. An honest fallback is
 better than a plausible-sounding fabrication.\
 """
 
+_CRITICAL_FORMAT = (
+    "CRITICAL FORMAT ENFORCEMENT:\n"
+    "- Use markdown: **bold** for key terms, hyphen "
+    "bullets for lists of 3+ items.\n"
+    "- Never use numbered lists or headers.\n"
+    "- Do not repeat yourself — say each thing once.\n"
+    "- Add blank lines between paragraphs.\n"
+    "- No strict word limit for list-based answers. "
+    "Cover all items completely. For prose answers "
+    "stay under 120 words.\n"
+    "- Do not start your answer with 'At Technossus'.\n\n"
+)
+
 
 class LLMService:
-    """Wrap Ollama generation with strict grounding instructions."""
+    """Wrap LLM generation — supports Ollama (dev) and Groq (test/prod)."""
 
     def __init__(
         self,
-        base_url: str,
-        model: str,
-        rewrite_model: str,
-        temperature: float,
-        top_p: float,
-        num_predict: int,
+        base_url: str = "",
+        model: str = "",
+        rewrite_model: str = "",
+        temperature: float = 0.2,
+        top_p: float = 0.8,
+        num_predict: int = 180,
+        groq_api_key: str = "",
+        answer_model: str = "",
     ) -> None:
+        self._groq_mode = bool(groq_api_key)
         self._base_url = base_url
-        self._model = model
+        # In Groq mode, answer_model is the primary model; fall back to model.
+        self._model = answer_model if groq_api_key else model
         self._rewrite_model = rewrite_model
         self._temperature = temperature
         self._top_p = top_p
         self._num_predict = num_predict
+        # Headers are only used in Groq mode; set unconditionally for mypy.
+        self._headers: dict[str, str] = {
+            "Authorization": f"Bearer {groq_api_key}",
+            "Content-Type": "application/json",
+        }
+
+    # ── internal helpers ────────────────────────────────────────────────────
+
+    async def _post_groq(
+        self,
+        client: httpx.AsyncClient,
+        model: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+        timeout: float,
+    ) -> str:
+        response = await client.post(
+            f"{_GROQ_BASE_URL}/chat/completions",
+            headers=self._headers,
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": False,
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+
+    async def _post_ollama(
+        self,
+        client: httpx.AsyncClient,
+        model: str,
+        prompt: str,
+        options: dict[str, float | int],
+        timeout: float,
+    ) -> str:
+        response = await client.post(
+            f"{self._base_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": options,
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.json().get("response", "")
+
+    # ── public methods ──────────────────────────────────────────────────────
 
     async def answer_question(
         self,
@@ -100,48 +173,45 @@ class LLMService:
         chat_history: list[str] | None = None,
     ) -> str:
         """Generate an answer constrained to retrieved context."""
-
         history_block = ""
         if chat_history:
             history_block = "Conversation history:\n" + "\n".join(chat_history) + "\n\n"
 
-        prompt = (
-            f"{_SYSTEM_PROMPT}\n\n"
+        user_content = (
             f"{history_block}"
             f"Website content:\n{context}\n\n"
-            "CRITICAL FORMAT ENFORCEMENT:\n"
-            "- Use markdown: **bold** for key terms, hyphen "
-            "bullets for lists of 3+ items.\n"
-            "- Never use numbered lists or headers.\n"
-            "- Do not repeat yourself — say each thing once.\n"
-            "- Add blank lines between paragraphs.\n"
-            "- No strict word limit for list-based answers. "
-            "Cover all items completely. For prose answers "
-            "stay under 120 words.\n"
-            "- Do not start your answer with 'At Technossus'.\n\n"
+            f"{_CRITICAL_FORMAT}"
             f"Question: {question}\n"
             "Answer:"
         )
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self._base_url}/api/generate",
-                    json={
-                        "model": self._model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {
+                if self._groq_mode:
+                    raw = await self._post_groq(
+                        client,
+                        model=self._model,
+                        messages=[
+                            {"role": "system", "content": _SYSTEM_PROMPT},
+                            {"role": "user", "content": user_content},
+                        ],
+                        max_tokens=self._num_predict,
+                        temperature=self._temperature,
+                        timeout=60,
+                    )
+                else:
+                    raw = await self._post_ollama(
+                        client,
+                        model=self._model,
+                        prompt=f"{_SYSTEM_PROMPT}\n\n{user_content}",
+                        options={
                             "temperature": self._temperature,
                             "top_p": self._top_p,
                             "num_predict": self._num_predict,
                         },
-                    },
-                    timeout=120,
-                )
-                response.raise_for_status()
-                data = response.json()
-                return _fix_encoding(data.get("response", "").strip())
+                        timeout=120,
+                    )
+            return _fix_encoding(raw.strip())
         except Exception as exc:
             LOGGER.error("[LLM] answer_question failed: %s", exc)
             return "I'm having trouble connecting right now. Please try again in a moment."
@@ -198,31 +268,35 @@ class LLMService:
         )
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self._base_url}/api/generate",
-                    json={
-                        "model": self._rewrite_model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {
-                            "temperature": 0.4,
-                            "num_predict": 80,
-                        },
-                    },
-                    timeout=15,
-                )
-                response.raise_for_status()
-                raw = response.json().get("response", "").strip()
-                raw = raw.strip("```json").strip("```").strip()
-                parsed = json.loads(raw)
-                if isinstance(parsed, list):
-                    return [_fix_encoding(str(s)) for s in parsed[:3]]
-                return []
+                if self._groq_mode:
+                    raw = await self._post_groq(
+                        client,
+                        model=self._rewrite_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=100,
+                        temperature=0.4,
+                        timeout=30,
+                    )
+                else:
+                    raw = await self._post_ollama(
+                        client,
+                        model=self._rewrite_model,
+                        prompt=prompt,
+                        options={"temperature": 0.4, "num_predict": 80},
+                        timeout=15,
+                    )
+            raw = raw.strip().strip("```json").strip("```").strip()
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [_fix_encoding(str(s)) for s in parsed[:3]]
+            return []
         except Exception as exc:
             LOGGER.warning("[LLM] follow_ups generation failed: %s", exc)
             return []
 
-    async def rewrite_query(self, question: str, chat_history: list[str]) -> str | None:
+    async def rewrite_query(
+        self, question: str, chat_history: list[str]
+    ) -> str | None:
         """Rewrite a vague follow-up into a standalone search query.
 
         Returns a short query string, or None if the call fails or returns empty.
@@ -234,8 +308,7 @@ class LLMService:
             "more", "tell me more", "explain", "elaborate", "expand",
             "which", "what about", "how about",
         )
-        question_lower = question.lower()
-        if not any(signal in question_lower for signal in FOLLOW_UP_SIGNALS):
+        if not any(sig in question.lower() for sig in FOLLOW_UP_SIGNALS):
             return None
 
         history_text = "\n".join(chat_history)
@@ -255,23 +328,25 @@ class LLMService:
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self._base_url}/api/generate",
-                    json={
-                        "model": self._rewrite_model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {
-                            "temperature": 0.0,
-                            "num_predict": 50,
-                        },
-                    },
-                    timeout=30,
-                )
-            response.raise_for_status()
-            result = response.json().get("response", "").strip()
+                if self._groq_mode:
+                    raw = await self._post_groq(
+                        client,
+                        model=self._rewrite_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=50,
+                        temperature=0.0,
+                        timeout=30,
+                    )
+                else:
+                    raw = await self._post_ollama(
+                        client,
+                        model=self._rewrite_model,
+                        prompt=prompt,
+                        options={"temperature": 0.0, "num_predict": 50},
+                        timeout=30,
+                    )
             # Take only the first line and strip stray quotes/backticks
-            result = result.split("\n")[0].strip().strip("\"'`")
+            result = raw.strip().split("\n")[0].strip().strip("\"'`")
             return result or None
         except Exception as exc:
             LOGGER.warning("[LLM] query rewrite failed: %s", exc)

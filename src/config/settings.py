@@ -9,6 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Centralized application configuration."""
 
+    env_mode: str = Field(default="dev", alias="ENV_MODE")
+    # Accepted values: "dev" (Ollama) or "test" (Groq+Nomic)
+
     app_name: str = "Techno-AI"
     app_env: str = "development"
     app_host: str = "0.0.0.0"
@@ -66,6 +69,22 @@ class Settings(BaseSettings):
     ollama_temperature: float = Field(default=0.2, alias="OLLAMA_TEMPERATURE")
     ollama_top_p: float = Field(default=0.8, alias="OLLAMA_TOP_P")
     ollama_num_predict: int = Field(default=180, alias="OLLAMA_NUM_PREDICT")
+
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    groq_answer_model: str = Field(
+        default="meta-llama/llama-4-scout-17b-16e-instruct",
+        alias="GROQ_ANSWER_MODEL",
+    )
+    groq_rewrite_model: str = Field(
+        default="llama-3.1-8b-instant",
+        alias="GROQ_REWRITE_MODEL",
+    )
+
+    nomic_api_key: str = Field(default="", alias="NOMIC_API_KEY")
+    nomic_embedding_model: str = Field(
+        default="nomic-embed-text-v1.5",
+        alias="NOMIC_EMBEDDING_MODEL",
+    )
 
     azure_search_endpoint: str = Field(
         default="", alias="AZURE_SEARCH_ENDPOINT"

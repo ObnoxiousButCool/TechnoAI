@@ -124,6 +124,8 @@ async def initialise_graph(database_url: str) -> None:
         or get_settings().database_url
     )
 
+    LOGGER.info("[graph] connecting to: %s", db_url[:50] + "...")
+
     # Run setup() on a direct connection with autocommit=True
     # because CREATE INDEX CONCURRENTLY cannot run inside
     # a transaction block (which the pool creates by default)
