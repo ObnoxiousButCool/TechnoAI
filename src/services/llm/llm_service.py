@@ -1,4 +1,4 @@
-﻿"""LLM response generation constrained to retrieved context using Ollama."""
+"""LLM response generation constrained to retrieved context using Groq."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ LOGGER = logging.getLogger(__name__)
 
 def _fix_encoding(text: str) -> str:
     return (
-        text.replace("â", "'")
-            .replace("â", '"')
-            .replace("â", '"')
+        text.replace("â", "'")
+            .replace("â", '"')
+            .replace("â", '"')
     )
 
 
@@ -68,23 +68,28 @@ better than a plausible-sounding fabrication.\
 
 
 class LLMService:
-    """Wrap Ollama generation with strict grounding instructions."""
+    """Wrap Groq generation with strict grounding instructions."""
 
     def __init__(
         self,
-        base_url: str,
-        model: str,
+        groq_api_key: str,
+        answer_model: str,
         rewrite_model: str,
         temperature: float,
         top_p: float,
         num_predict: int,
     ) -> None:
-        self._base_url = base_url
-        self._model = model
+        self._api_key = groq_api_key
+        self._answer_model = answer_model
         self._rewrite_model = rewrite_model
         self._temperature = temperature
         self._top_p = top_p
         self._num_predict = num_predict
+        self._base_url = "https://api.groq.com/openai/v1"
+        self._headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
 
     async def answer_question(
         self,
@@ -98,20 +103,18 @@ class LLMService:
         if chat_history:
             history_block = "Conversation history:\n" + "\n".join(chat_history) + "\n\n"
 
-        prompt = (
-            f"{_SYSTEM_PROMPT}\n\n"
+        user_message = (
             f"{history_block}"
             f"Website content:\n{context}\n\n"
-            "CRITICAL GROUNDING INSTRUCTION:\n"
-            "Your answer must be built EXCLUSIVELY from the Website "
-            "content section above. Every service name, statistic, "
-            "percentage, and detail must appear word-for-word in that "
-            "content. If a service name in your answer does not appear "
-            "in the Website content above, you are hallucinating — "
-            "stop and use the fallback message instead.\n"
-            "Fallback message: I can help with questions based on "
-            "Technossus website content. You can ask about our services, "
-            "industries, case studies, leadership, or AI capabilities.\n\n"
+            "CRITICAL FORMAT ENFORCEMENT:\n"
+            "- Plain text only. No markdown.\n"
+            "- Never use **, *, #, or any markdown symbol.\n"
+            "- Do not repeat yourself. Say each thing once.\n"
+            "- If listing items, use ONLY hyphen bullets.\n"
+            "- Do not write a prose sentence AND then repeat "
+            "the same items as bullets. Choose one format.\n"
+            "- Maximum 90 words total.\n"
+            "- Do not start your answer with 'At Technossus'.\n\n"
             f"Question: {question}\n"
             "Answer:"
         )
@@ -119,22 +122,23 @@ class LLMService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
-                        "model": self._model,
-                        "prompt": prompt,
+                        "model": self._answer_model,
+                        "messages": [
+                            {"role": "system", "content": _SYSTEM_PROMPT},
+                            {"role": "user", "content": user_message},
+                        ],
+                        "temperature": self._temperature,
+                        "max_tokens": self._num_predict,
                         "stream": False,
-                        "options": {
-                            "temperature": self._temperature,
-                            "top_p": self._top_p,
-                            "num_predict": self._num_predict,
-                        },
                     },
-                    timeout=120,
+                    timeout=60,
                 )
                 response.raise_for_status()
                 data = response.json()
-                return _fix_encoding(data.get("response", "").strip())
+                return _fix_encoding(data["choices"][0]["message"]["content"].strip())
         except Exception as exc:
             LOGGER.error("[LLM] answer_question failed: %s", exc)
             return "I'm having trouble connecting right now. Please try again in a moment."
@@ -180,20 +184,22 @@ class LLMService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
                         "model": self._rewrite_model,
-                        "prompt": prompt,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.4,
+                        "max_tokens": 100,
                         "stream": False,
-                        "options": {
-                            "temperature": 0.4,
-                            "num_predict": 80,
-                        },
                     },
-                    timeout=15,
+                    timeout=30,
                 )
                 response.raise_for_status()
-                raw = response.json().get("response", "").strip()
+                data = response.json()
+                raw = data["choices"][0]["message"]["content"].strip()
                 raw = raw.strip("```json").strip("```").strip()
                 parsed = json.loads(raw)
                 if isinstance(parsed, list):
@@ -237,20 +243,22 @@ class LLMService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self._base_url}/api/generate",
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers,
                     json={
                         "model": self._rewrite_model,
-                        "prompt": prompt,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 50,
                         "stream": False,
-                        "options": {
-                            "temperature": 0.0,
-                            "num_predict": 50,
-                        },
                     },
                     timeout=30,
                 )
             response.raise_for_status()
-            result = response.json().get("response", "").strip()
+            data = response.json()
+            result = data["choices"][0]["message"]["content"].strip()
             # Take only the first line and strip stray quotes/backticks
             result = result.split("\n")[0].strip().strip("\"'`")
             return result or None
