@@ -53,7 +53,7 @@ class SitemapCrawler:
             return manual_urls
 
         raise ValueError(
-            "No valid sitemap URLs found and WEBSITE_URLS is not configured."
+            "No valid sitemap URLs found and WB_WEBSITE_URLS is not configured."
         )
 
     def fetch_page(self, url: str) -> str:

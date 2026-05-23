@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     get_vector_store().initialize(vector_size=settings.embedding_dimensions)
     from src.graph.graph import initialise_graph
-    await initialise_graph(get_settings().database_url)
+    await initialise_graph(get_settings().WB_DATABASE_URL)
     LOGGER.info("[startup] LangGraph graph ready")
     Scheduler().start()
     yield

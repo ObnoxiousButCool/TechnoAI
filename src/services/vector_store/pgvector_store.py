@@ -20,12 +20,12 @@ LOGGER = logging.getLogger(__name__)
 class PGVectorStore(VectorStore):
     """Persist vectors in PostgreSQL with pgvector."""
 
-    def __init__(self, database_url: str) -> None:
-        self._database_url = database_url
+    def __init__(self, WB_DATABASE_URL: str) -> None:
+        self._WB_DATABASE_URL = WB_DATABASE_URL
 
     @contextmanager
     def _connection(self) -> Iterator:
-        connection = connect(self._database_url, row_factory=dict_row)
+        connection = connect(self._WB_DATABASE_URL, row_factory=dict_row)
         register_vector(connection)
         try:
             yield connection

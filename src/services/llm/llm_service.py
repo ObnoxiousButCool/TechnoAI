@@ -1,4 +1,4 @@
-"""LLM response generation constrained to retrieved context using Groq."""
+﻿"""LLM response generation constrained to retrieved context using Groq."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ statistic, name, percentage, and detail in your response MUST appear
 verbatim or be directly inferable from that content. If the content
 does not clearly support the answer, you MUST respond with exactly
 this message and nothing else:
-I can help with questions based on Technossus website content. You can ask about our services, industries, case studies, leadership, or AI capabilities.
+I can help with questions based on Word & Brown website content. You can ask about our services, industries, case studies, leadership, or AI capabilities.
 
 CONTACT RULE:
 This rule ONLY applies when the user's question explicitly asks for contact information, a phone number, an email address, office locations, or how to get in touch.

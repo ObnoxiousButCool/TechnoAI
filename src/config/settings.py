@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     # Embedding output dimension — nomic-embed-text produces 768-dim vectors
     embedding_dimensions: int = Field(default=768, alias="EMBEDDING_DIMENSIONS")
 
-    database_url: str = Field(
+    WB_DATABASE_URL: str = Field(
         default="postgresql://postgres:postgres@db:5432/techno_ai",
-        alias="DATABASE_URL",
+        alias="WB_DATABASE_URL",
     )
     enable_website_ingest: bool = Field(
         default=True,
@@ -39,8 +39,8 @@ class Settings(BaseSettings):
         default=False,
         alias="ENABLE_FILE_INGEST",
     )
-    website_url: str = Field(default="", alias="WEBSITE_URL")
-    website_urls: str = Field(default="", alias="WEBSITE_URLS")
+    WB_WEBSITE_URL: str = Field(default="", alias="WB_WEBSITE_URL")
+    WB_WEBSITE_URLs: str = Field(default="", alias="WB_WEBSITE_URLS")
     pdf_directory: str = Field(default="./data/pdfs", alias="PDF_DIRECTORY")
     chunk_size_words: int = Field(default=700, alias="CHUNK_SIZE_WORDS")
     chunk_overlap_words: int = Field(default=100, alias="CHUNK_OVERLAP_WORDS")

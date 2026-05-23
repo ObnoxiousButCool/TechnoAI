@@ -47,6 +47,7 @@ def load_session(state: ChatState) -> dict:
     On returning turns: checkpointer already restored
     chat_history from Postgres — return it unchanged.
     """
+    LOGGER.info("[timing] load_session start")
     existing = state.get("chat_history")
     if existing is None:
         return {"chat_history": []}
@@ -76,11 +77,14 @@ async def rewrite_query(state: ChatState) -> dict:
     search queries using the dedicated rewrite model.
     Falls back to the raw question on failure.
     """
+    LOGGER.info("[timing] rewrite_query start")
     llm = get_llm_service()
     question = state.get("question", "")
     history = state.get("chat_history", [])
     rewritten = await llm.rewrite_query(question, history)
-    return {"retrieval_query": rewritten or question}
+    retrieval_query = rewritten or question
+    LOGGER.info("[timing] rewrite_query end: %s", retrieval_query)
+    return {"retrieval_query": retrieval_query}
 
 
 def slug_router(state: ChatState) -> dict:
@@ -98,10 +102,11 @@ def slug_router(state: ChatState) -> dict:
 # ── Retrieval ─────────────────────────────────────────────
 
 def fetch_overview(state: ChatState) -> dict:
-    """
-    Fetch the first chunk from each of the 6 service pages.
-    Used for service overview questions.
-    """
+    """Fetch first chunk from each service page in parallel."""
+    LOGGER.info("[timing] fetch_overview start")
+    import asyncio
+    import concurrent.futures
+
     vector_store = get_vector_store()
     service_slugs = [
         "ai-business-transformation",
@@ -111,19 +116,37 @@ def fetch_overview(state: ChatState) -> dict:
         "product-engineering",
         "quality-engineering",
     ]
-    chunks = []
-    for slug in service_slugs:
+
+    def fetch_slug(slug: str):
         results = vector_store.get_by_url(slug)
-        if results:
-            chunks.append(results[0])
+        return results[0] if results else None
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=6
+    ) as executor:
+        futures = [
+            executor.submit(fetch_slug, slug)
+            for slug in service_slugs
+        ]
+        results = [
+            f.result()
+            for f in concurrent.futures.as_completed(
+                futures
+            )
+        ]
+
+    chunks = [r for r in results if r is not None]
     context = RAGService._build_context(chunks)
     sources = [
         {"chunk_id": c.chunk_id, "score": c.score,
          "metadata": c.metadata}
         for c in chunks
     ]
-    return {"chunks": chunks, "context": context,
-            "sources": sources}
+    return {
+        "chunks": chunks,
+        "context": context,
+        "sources": sources,
+    }
 
 
 def fetch_by_slug(state: ChatState) -> dict:
@@ -160,6 +183,7 @@ def semantic_retrieve(state: ChatState) -> dict:
     Embed the retrieval query and search pgvector.
     Returns raw results before score filtering.
     """
+    LOGGER.info("[timing] semantic_retrieve start")
     embedding_service = get_embedding_service()
     vector_store = get_vector_store()
     settings = get_settings()
@@ -217,6 +241,7 @@ async def llm_answer(state: ChatState) -> dict:
     Run answer_question and generate_follow_ups in parallel.
     Both calls use the same retrieved context.
     """
+    LOGGER.info("[timing] llm_answer start")
     llm = get_llm_service()
     question = state.get("question", "")
     context = state.get("context", "")
@@ -264,6 +289,7 @@ def save_session(state: ChatState) -> dict:
     state. LangGraph checkpointer persists this to
     Postgres automatically.
     """
+    LOGGER.info("[timing] save_session start")
     question = state.get("question", "")
     answer = state.get("answer", "")
     history = list(state.get("chat_history") or [])

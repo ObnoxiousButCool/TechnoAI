@@ -104,7 +104,7 @@ stages:
 
               # Detect default open database URL containing credentials
               if grep -qE 'postgresql://[^@]+:[^@]+@' src/config/settings.py 2>/dev/null; then
-                echo "##vso[task.logissue type=warning]src/config/settings.py: DATABASE_URL default contains embedded credentials. Use a Key Vault reference or pipeline secret variable instead."
+                echo "##vso[task.logissue type=warning]src/config/settings.py: WB_DATABASE_URL default contains embedded credentials. Use a Key Vault reference or pipeline secret variable instead."
                 ISSUES=$((ISSUES + 1))
               fi
 

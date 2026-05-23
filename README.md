@@ -20,10 +20,10 @@ Edit `.env` and set at minimum:
 
 | Variable | Example | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/techno_ai` | Use `@db:...` inside Docker |
+| `WB_DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/techno_ai` | Use `@db:...` inside Docker |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server for LLM + embeddings |
-| `WEBSITE_URL` | `https://www.technossus.com/` | Root URL to crawl |
-| `WEBSITE_URLS` | `/,/about,/services` | Fallback pages if sitemap missing |
+| `WB_WEBSITE_URL` | `https://www.technossus.com/` | Root URL to crawl |
+| `WB_WEBSITE_URLS` | `/,/about,/services` | Fallback pages if sitemap missing |
 
 ### 2. Install dependencies
 
@@ -47,7 +47,7 @@ automatically — no manual migrations needed.
 Ensure PostgreSQL with the pgvector extension is running, then:
 
 ```bash
-# Set DATABASE_URL to your local Postgres instance in .env
+# Set WB_DATABASE_URL to your local Postgres instance in .env
 uvicorn src.main:app --reload
 ```
 
@@ -126,7 +126,7 @@ Response shape:
 | Variable | Default | Notes |
 |---|---|---|
 | `VECTOR_STORE_TYPE` | `pgvector` | Only `pgvector` is supported |
-| `DATABASE_URL` | `postgresql://postgres:postgres@db:5432/techno_ai` | Standard libpq connection string |
+| `WB_DATABASE_URL` | `postgresql://postgres:postgres@db:5432/techno_ai` | Standard libpq connection string |
 | `EMBEDDING_DIMENSIONS` | `768` | Must match the embedding model output; nomic-embed-text = 768 |
 
 ### Ollama
@@ -154,8 +154,8 @@ Response shape:
 - The vector store is abstracted behind `VectorStore` (see
   [src/services/vector_store/base.py](src/services/vector_store/base.py)) so
   alternative backends can be added without touching the RAG or ingestion logic.
-- Website ingestion tries `WEBSITE_URL/sitemap.xml` first.  If the sitemap is
+- Website ingestion tries `WB_WEBSITE_URL/sitemap.xml` first.  If the sitemap is
   missing, invalid, HTML, empty, or cannot be parsed it falls back to
-  `WEBSITE_URLS`; relative paths are resolved against `WEBSITE_URL`.
+  `WB_WEBSITE_URLS`; relative paths are resolved against `WB_WEBSITE_URL`.
 - The scheduler (`src/jobs/scheduler.py`) is a placeholder for future
   cron-based ingestion jobs.
