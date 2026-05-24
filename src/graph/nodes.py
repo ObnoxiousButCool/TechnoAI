@@ -104,17 +104,15 @@ def slug_router(state: ChatState) -> dict:
 def fetch_overview(state: ChatState) -> dict:
     """Fetch first chunk from each service page in parallel."""
     LOGGER.info("[timing] fetch_overview start")
-    import asyncio
     import concurrent.futures
 
     vector_store = get_vector_store()
     service_slugs = [
-        "ai-business-transformation",
-        "cloud-product-modernization",
-        "data-intelligence-analytics",
-        "digital-experience-design",
-        "product-engineering",
-        "quality-engineering",
+        "products",
+        "carriers-products",
+        "broker-resources",
+        "newsroom",
+        "about",
     ]
 
     def fetch_slug(slug: str):

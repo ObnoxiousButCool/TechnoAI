@@ -13,8 +13,8 @@ from src.services.vector_store.base import SearchResult, VectorStore
 LOGGER = logging.getLogger(__name__)
 
 FALLBACK_RESPONSE = (
-    "I can help with questions based on Technossus website content. "
-    "You can ask about our services, industries, case studies, leadership, or AI capabilities."
+    "I can help with questions based on Word & Brown website content. "
+    "You can ask about our insurance services, broker resources, products, carriers, or how to get started."
 )
 
 # Canonical service list — deterministic, so the answer is always consistent
@@ -32,11 +32,12 @@ _CANONICAL_SERVICES = [
 _SERVICE_OVERVIEW_RE = re.compile(
     r"\b("
     r"what services|which services|list (your |the )?services|"
-    r"services (do you|does technossus|you) offer|"
-    r"what do you offer|what (can|does) technossus (do|offer|help)|"
-    r"(your |the )?services (you |technossus )?(provide|have)|"
+    r"services (do you|does word.{0,10}brown|you) offer|"
+    r"what do you offer|what (can|does) word.{0,10}brown (do|offer|help)|"
+    r"(your |the )?services (you |word.{0,10}brown )?(provide|have)|"
     r"tell me (about )?(your |the )?services|"
-    r"overview of (your |the )?services"
+    r"overview of (your |the )?services|"
+    r"what insurance|which insurance|insurance (do you|you) offer"
     r")\b",
     re.IGNORECASE,
 )
@@ -49,32 +50,43 @@ def _is_service_overview(question: str) -> bool:
 # Maps canonical service name substrings → URL slug fragment.
 # Used to boost retrieval precision when a rewrite query names a specific service.
 _SERVICE_SLUG_MAP: list[tuple[str, str]] = [
-    ("ai business transformation", "ai-business-transformation"),
-    ("cloud & product modernization", "cloud-product-modernization"),
-    ("cloud and product modernization", "cloud-product-modernization"),
-    ("data intelligence & analytics", "data-intelligence-analytics"),
-    ("data intelligence and analytics", "data-intelligence-analytics"),
-    ("digital experience design", "digital-experience-design"),
-    ("product engineering", "product-engineering"),
-    ("quality engineering", "quality-engineering"),
-    ("case study", "case-studies"),
-    ("case studies", "case-studies"),
-    ("our work", "case-studies"),
-    ("testimonial", "about"),
-    ("clients say", "about"),
-    ("what clients", "about"),
-    ("contact", "contact"),
-    ("reach out", "contact"),
-    ("get in touch", "contact"),
-    ("phone", "contact"),
-    ("email", "contact"),
-    ("office", "contact"),
-    ("location", "contact"),
-    ("leadership", "about"),
-    ("leaders", "about"),
-    ("executive", "about"),
-    ("team members", "about"),
-    ("who is", "about"),
+    ("small group",           "products"),
+    ("large group",           "products"),
+    ("ancillary",             "products"),
+    ("individual",            "products"),
+    ("family plan",           "products"),
+    ("peo",                   "products"),
+    ("professional employer", "products"),
+    ("dental",                "products"),
+    ("vision",                "products"),
+    ("life insurance",        "products"),
+    ("supplemental",          "products"),
+    ("quoting",               "broker-resources"),
+    ("enrollment",            "broker-resources"),
+    ("broker resource",       "broker-resources"),
+    ("broker tool",           "broker-resources"),
+    ("carrier",               "carriers-products"),
+    ("product",               "products"),
+    ("newsroom",              "newsroom"),
+    ("news",                  "newsroom"),
+    ("compliance",            "newsroom"),
+    ("partner",               "partners"),
+    ("contact",               "contact"),
+    ("reach out",             "contact"),
+    ("get in touch",          "contact"),
+    ("phone",                 "contact"),
+    ("email",                 "contact"),
+    ("office",                "contact"),
+    ("location",              "contact"),
+    ("leadership",            "about/executive-team"),
+    ("leaders",               "about/executive-team"),
+    ("executive",             "about/executive-team"),
+    ("team members",          "about/executive-team"),
+    ("who is",                "about/executive-team"),
+    ("about",                 "about"),
+    ("getting started",       "about/getting-started"),
+    ("careers",               "careers"),
+    ("jobs",                  "careers"),
 ]
 
 

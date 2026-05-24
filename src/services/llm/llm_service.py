@@ -15,12 +15,14 @@ def _fix_encoding(text: str) -> str:
         text.replace("â", "'")
             .replace("â", '"')
             .replace("â", '"')
+            .replace("â", "—")
+            .replace("â", "—")
+            .replace("â", "—")
     )
 
 
 _SYSTEM_PROMPT = """\
-You are Techno-AI, the intelligent assistant built into the Technossus
-website. Speak as Technossus — use "we", "our", "at Technossus".
+You are the Word & Brown Assistant, the AI assistant built into the Word & Brown website. Word & Brown is a General Agency that makes insurance sales easier for brokers. Speak as Word & Brown — use "we", "our", "at Word & Brown".
 Never say "they" or "the company".
 
 GROUNDING RULE — this is your most important instruction:
@@ -29,13 +31,13 @@ statistic, name, percentage, and detail in your response MUST appear
 verbatim or be directly inferable from that content. If the content
 does not clearly support the answer, you MUST respond with exactly
 this message and nothing else:
-I can help with questions based on Word & Brown website content. You can ask about our services, industries, case studies, leadership, or AI capabilities.
+I can help with questions based on Word & Brown website content. You can ask about our insurance services, broker resources, products, carriers, or how to get started.
 
 CONTACT RULE:
 This rule ONLY applies when the user's question explicitly asks for contact information, a phone number, an email address, office locations, or how to get in touch.
 For ALL other questions, ignore this rule entirely and do not mention contact details.
 When the rule applies, respond with exactly this and nothing else:
-You can reach us at contact@technossus.com or call +1 (949) 769-3500. You can also visit our contact page at https://technossus.com/contact to fill out a form and our team will get back to you.
+You can visit our contact page at https://www.wordandbrown.com/contact to get in touch with our team, or call us at +1 (800) 869-6989. Our team is ready to help brokers with insurance solutions.
 
 Never invent, estimate, or extrapolate statistics, percentages,
 dates, names, or outcomes. If a number is not in the content,
@@ -114,7 +116,7 @@ class LLMService:
             "- Do not write a prose sentence AND then repeat "
             "the same items as bullets. Choose one format.\n"
             "- Maximum 90 words total.\n"
-            "- Do not start your answer with 'At Technossus'.\n\n"
+            "- Do not start your answer with 'At Word & Brown'.\n\n"
             f"Question: {question}\n"
             "Answer:"
         )
@@ -152,7 +154,7 @@ class LLMService:
         """Generate 2-3 contextually relevant follow-up suggestions."""
         prompt = (
             "You generate follow-up suggestions for the "
-            "Technossus website chatbot.\n\n"
+            "Word & Brown website chatbot.\n\n"
             "The user asked: " + question + "\n\n"
             "The website content used to answer was:\n"
             + context[:800] + "\n\n"
@@ -163,15 +165,19 @@ class LLMService:
             "2. Be broad — ask about a service area, industry, "
             "or company topic, NOT about specific details, "
             "numbers, or how something was done\n"
-            "3. Be about Technossus offerings, not about the "
+            "3. Be about Word & Brown insurance services, broker "
+            "resources, products, or carriers, not about the "
             "user's situation\n"
             "4. Be under 10 words\n\n"
             "NEVER ask about: specific metrics, technical "
             "details of how something worked, names of systems "
             "used, or anything not in the content above.\n\n"
-            "GOOD examples: 'What industries do you serve?', "
-            "'Tell me about healthcare services.', "
-            "'Do you work with financial services?'\n\n"
+            "GOOD examples for a services question:\n"
+            "[\"Small group insurance\", \"Broker resources\","
+            " \"Get a quote\"]\n\n"
+            "GOOD examples for a products question:\n"
+            "[\"Ancillary products\", \"Carrier options\","
+            " \"Enrollment tools\"]\n\n"
             "BAD examples: 'What was the platform built with?', "
             "'How did the CRM handle data?', "
             "'What were the specific results?'\n\n"
