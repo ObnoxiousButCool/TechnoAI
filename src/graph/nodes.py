@@ -21,12 +21,6 @@ from src.config.settings import get_settings
 
 LOGGER = logging.getLogger(__name__)
 
-CONTACT_INTENT_RE = re.compile(
-    r"\b(contact|email|phone|call|reach|get in touch|"
-    r"office|location|address|speak to|talk to someone)\b",
-    re.IGNORECASE,
-)
-
 CLOSURE_RE = re.compile(
     r"\b(thank|thanks|that.s all|that.s everything|bye|"
     r"goodbye|no more questions|i.m done|that.s it)\b",
@@ -34,8 +28,7 @@ CLOSURE_RE = re.compile(
 )
 
 CLOSURE_ANSWER = (
-    "Thanks for chatting with us! If you ever have more "
-    "questions about Technossus, feel free to ask anytime."
+    "Thanks for chatting! Feel free to come back anytime you have questions."
 )
 
 
@@ -58,13 +51,11 @@ def load_session(state: ChatState) -> dict:
 def intent_router(state: ChatState) -> dict:
     """
     Classify question intent.
-    Returns one of: overview | contact | closure | general
+    Returns one of: overview | closure | general
     """
     question = state.get("question", "")
     if CLOSURE_RE.search(question):
         return {"intent": "closure"}
-    if CONTACT_INTENT_RE.search(question):
-        return {"intent": "contact"}
     if is_service_overview(question):
         return {"intent": "overview"}
     return {"intent": "general"}
@@ -99,9 +90,10 @@ def slug_router(state: ChatState) -> dict:
 
 def fetch_overview(state: ChatState) -> dict:
     """
-    Fetch the first chunk from each of the 6 service pages.
+    Fetch the first chunk from each of the 6 service pages in parallel.
     Used for service overview questions.
     """
+    import concurrent.futures
     vector_store = get_vector_store()
     service_slugs = [
         "ai-business-transformation",
@@ -111,11 +103,16 @@ def fetch_overview(state: ChatState) -> dict:
         "product-engineering",
         "quality-engineering",
     ]
-    chunks = []
-    for slug in service_slugs:
+
+    def fetch_slug(slug: str):
         results = vector_store.get_by_url(slug)
-        if results:
-            chunks.append(results[0])
+        return results[0] if results else None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(fetch_slug, slug) for slug in service_slugs]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    chunks = [r for r in results if r is not None]
     context = RAGService._build_context(chunks)
     sources = [
         {"chunk_id": c.chunk_id, "score": c.score,
@@ -230,21 +227,6 @@ async def llm_answer(state: ChatState) -> dict:
         "answer": answer_text or FALLBACK_RESPONSE,
         "follow_ups": follow_ups,
     }
-
-
-def contact_response(state: ChatState) -> dict:
-    """
-    Return the hardcoded contact details.
-    Contact info is sourced from the website footer,
-    not from ingested chunks, to avoid placeholder numbers.
-    """
-    answer = (
-        "You can reach us at contact@technossus.com or call "
-        "+1 (949) 769-3500. You can also visit our contact "
-        "page at https://technossus.com/contact to fill out "
-        "a form and our team will get back to you."
-    )
-    return {"answer": answer, "follow_ups": [], "sources": []}
 
 
 def closure_response(state: ChatState) -> dict:

@@ -196,19 +196,25 @@ class AzureSearchVectorStore(VectorStore):
         return output
 
     def get_by_url(self, url_substring: str) -> list[SearchResult]:
-        """Return all chunks whose metadata url contains url_substring."""
+        """Return all chunks whose source_id contains url_substring.
+
+        metadata_json is stored but not searchable or filterable in the
+        Azure AI Search index, so we cannot use it in search_fields or a
+        $filter expression.  source_id is filterable and holds the URL
+        path (minus the https:// prefix), so a Python substring check on
+        source_id is both correct and cheap for this index size.
+        """
         client = self._search_client()
         results = client.search(
-            search_text=url_substring,
-            search_fields=["metadata_json"],
-            select=["chunk_id", "content", "metadata_json"],
-            top=50,
+            search_text="*",
+            select=["chunk_id", "content", "metadata_json", "source_id"],
+            top=1000,
         )
         output = []
         for r in results:
-            metadata = json.loads(r.get("metadata_json") or "{}")
-            url = metadata.get("url", "")
-            if url_substring in url:
+            source_id = r.get("source_id") or ""
+            if url_substring in source_id:
+                metadata = json.loads(r.get("metadata_json") or "{}")
                 output.append(
                     SearchResult(
                         chunk_id=_decode_key(r["chunk_id"]),
