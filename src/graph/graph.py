@@ -132,7 +132,7 @@ async def initialise_graph(database_url: str) -> None:
     pool: AsyncConnectionPool[psycopg.AsyncConnection[dict[str, Any]]] = AsyncConnectionPool(
         conninfo=database_url,
         max_size=10,
-        min_size=1,
+        min_size=3,
         open=False,
         kwargs={
             "row_factory": dict_row,
