@@ -242,21 +242,10 @@ stages:
               steps:
                 - checkout: self
 
-                - task: UsePythonVersion@0
-                  displayName: 'Use Python $(PYTHON_VERSION)'
-                  inputs:
-                    versionSpec: $(PYTHON_VERSION)
-                    addToPath: true
-
-                # Install dependencies into a local folder so they are
-                # included in the deployment package.
-                - script: |
-                    pip install --target=".python_packages/lib/site-packages" -r requirements.txt
-                  displayName: 'Install dependencies into package folder'
-
-                # Zip the application source + installed packages.
+                # Zip source only — no manual pip install.
+                # Oryx will install deps from requirements.txt during deployment.
                 - task: ArchiveFiles@2
-                  displayName: 'Archive application into zip'
+                  displayName: 'Archive application source into zip'
                   inputs:
                     rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
                     includeRootFolder: false
@@ -266,12 +255,11 @@ stages:
                     excludePaths: |
                       .git
                       .venv
+                      .python_packages
                       __pycache__
                       chroma_db
                       *.pyc
 
-                # Publish the zip as a pipeline artifact so it can be
-                # downloaded or promoted to other stages/environments.
                 - task: PublishBuildArtifacts@1
                   displayName: 'Publish app.zip artifact'
                   inputs:
@@ -279,10 +267,6 @@ stages:
                     ArtifactName: 'api-drop'
                     publishLocation: Container
 
-                # Deploy to Azure App Service (Linux).
-                # Requires an Azure Resource Manager service connection named
-                # $(AZURE_SERVICE_CONNECTION) with at least "Contributor" on
-                # the target App Service / resource group.
                 - task: AzureWebApp@1
                   displayName: 'Deploy to Technossus-API-Dev'
                   inputs:
@@ -290,5 +274,8 @@ stages:
                     appType: webAppLinux
                     appName: $(WEBAPP_NAME)
                     package: '$(Build.ArtifactStagingDirectory)/app.zip'
-                    runtimeStack: 'PYTHON|3.12'
-                    startUpCommand: 'gunicorn -w 2 -k uvicorn.workers.UvicornWorker src.main:app --bind 0.0.0.0:8000'
+                    appSettings: >
+                      -SCM_DO_BUILD_DURING_DEPLOYMENT true
+                      -ENABLE_ORYX_BUILD true
+                      -WEBSITES_PORT 8000
+                      -POST_BUILD_COMMAND "echo Build complete"
