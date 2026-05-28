@@ -47,7 +47,7 @@ def _to_response(row: dict) -> dict:
 
 @router.get(
     "",
-    response_model=list[dict],
+    response_model=dict,
     summary="List published insights",
     description="Retrieve a list of published insights with optional filtering by industry and service",
 )
@@ -56,7 +56,7 @@ def list_insights(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service category"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip for pagination"),
-):
+) -> dict:
     """List published insights, ordered by creation date descending.
     
     Args:
@@ -66,17 +66,44 @@ def list_insights(
         offset: Results to skip for pagination
         
     Returns:
-        List of insight objects
+        Dict with insights data and pagination metadata
         
     Raises:
         HTTPException: 500 if database error occurs
     """
     try:
         svc = get_content_db_service()
+        
+        # Get total count
+        total = svc.count_insights(
+            published_only=True, industry=industry, service=service
+        )
+        
+        # Get paginated data
         rows = svc.list_insights(
             published_only=True, industry=industry, service=service, limit=limit, offset=offset
         )
-        return [_to_response(r) for r in rows]
+        
+        # Calculate pagination metadata
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+        has_next = offset + limit < total
+        has_previous = offset > 0
+        
+        LOGGER.info(f"Retrieved {len(rows)} of {total} insights (page {current_page}/{total_pages})")
+        
+        return {
+            "data": [_to_response(r) for r in rows],
+            "pagination": {
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "currentPage": current_page,
+                "totalPages": total_pages,
+                "hasNext": has_next,
+                "hasPrevious": has_previous,
+            }
+        }
     except Exception as e:
         LOGGER.error(f"Error listing insights: {e}", exc_info=True)
         raise HTTPException(
@@ -90,7 +117,7 @@ def list_insights(
 
 @router.get(
     "/admin/all",
-    response_model=list[dict],
+    response_model=dict,
     summary="List all insights (admin)",
     description="Retrieve all insights including unpublished ones. For admin use only.",
 )
@@ -99,18 +126,45 @@ def list_all_insights(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service"),
     limit: int = Query(100, ge=1, le=500, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results to skip"),
-):
+) -> dict:
     """List all insights including unpublished (admin endpoint).
     
     Returns:
-        List of all insight objects including unpublished
+        Dict with all insights data and pagination metadata
     """
     try:
         svc = get_content_db_service()
+        
+        # Get total count
+        total = svc.count_insights(
+            published_only=False, industry=industry, service=service
+        )
+        
+        # Get paginated data
         rows = svc.list_insights(
             published_only=False, industry=industry, service=service, limit=limit, offset=offset
         )
-        return [_to_response(r) for r in rows]
+        
+        # Calculate pagination metadata
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+        has_next = offset + limit < total
+        has_previous = offset > 0
+        
+        LOGGER.info(f"Admin retrieved {len(rows)} of {total} insights (page {current_page}/{total_pages})")
+        
+        return {
+            "data": [_to_response(r) for r in rows],
+            "pagination": {
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "currentPage": current_page,
+                "totalPages": total_pages,
+                "hasNext": has_next,
+                "hasPrevious": has_previous,
+            }
+        }
     except Exception as e:
         LOGGER.error(f"Error listing all insights: {e}", exc_info=True)
         raise HTTPException(

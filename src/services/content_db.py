@@ -149,6 +149,35 @@ class ContentDBService:
 
     # ─── Case Studies CRUD ────────────────────────────
 
+    def count_case_studies(
+        self,
+        published_only: bool = True,
+        industry: Optional[str] = None,
+        service: Optional[str] = None,
+    ) -> int:
+        """Count case studies with optional filters."""
+
+        conditions = []
+        params: list = []
+
+        if published_only:
+            conditions.append("is_published = TRUE")
+        if industry:
+            conditions.append("industry = %s")
+            params.append(industry)
+        if service:
+            conditions.append("service = %s")
+            params.append(service)
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = f"SELECT COUNT(*) as count FROM case_studies {where}"
+
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                result = cur.fetchone()
+                return result["count"] if result else 0
+
     def list_case_studies(
         self,
         published_only: bool = True,
@@ -331,6 +360,35 @@ class ContentDBService:
                 return result
 
     # ─── Insights CRUD ────────────────────────────────────────────────────────
+
+    def count_insights(
+        self,
+        published_only: bool = True,
+        industry: Optional[str] = None,
+        service: Optional[str] = None,
+    ) -> int:
+        """Count insights with optional filters."""
+
+        conditions = []
+        params: list = []
+
+        if published_only:
+            conditions.append("is_published = TRUE")
+        if industry:
+            conditions.append("industry = %s")
+            params.append(industry)
+        if service:
+            conditions.append("service = %s")
+            params.append(service)
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = f"SELECT COUNT(*) as count FROM insights {where}"
+
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                result = cur.fetchone()
+                return result["count"] if result else 0
 
     def list_insights(
         self,

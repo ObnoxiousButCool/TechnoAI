@@ -52,11 +52,11 @@ def _to_response(row: dict) -> dict:
 
 @router.get(
     "",
-    response_model=list[dict],
+    response_model=dict,
     summary="List published case studies",
     description="Retrieve a list of published case studies with optional filtering",
     responses={
-        200: {"description": "List of case studies retrieved successfully"},
+        200: {"description": "List of case studies retrieved successfully with pagination"},
     },
 )
 def list_case_studies(
@@ -64,7 +64,7 @@ def list_case_studies(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-) -> list[dict]:
+) -> dict:
     """List published case studies, ordered by creation date descending.
     
     Args:
@@ -74,18 +74,44 @@ def list_case_studies(
         offset: Number of results to skip (default 0)
         
     Returns:
-        List of published case study objects
+        Dict with case studies data and pagination metadata
         
     Raises:
         HTTPException: 500 if database operation fails
     """
     try:
         svc = get_content_db_service()
+        
+        # Get total count
+        total = svc.count_case_studies(
+            published_only=True, industry=industry, service=service
+        )
+        
+        # Get paginated data
         rows = svc.list_case_studies(
             published_only=True, industry=industry, service=service, limit=limit, offset=offset
         )
-        LOGGER.info(f"Retrieved {len(rows)} case studies (industry={industry}, service={service})")
-        return [_to_response(r) for r in rows]
+        
+        # Calculate pagination metadata
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+        has_next = offset + limit < total
+        has_previous = offset > 0
+        
+        LOGGER.info(f"Retrieved {len(rows)} of {total} case studies (page {current_page}/{total_pages})")
+        
+        return {
+            "data": [_to_response(r) for r in rows],
+            "pagination": {
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "currentPage": current_page,
+                "totalPages": total_pages,
+                "hasNext": has_next,
+                "hasPrevious": has_previous,
+            }
+        }
     except Exception as e:
         LOGGER.error(f"Error listing case studies: {e}", exc_info=True)
         raise HTTPException(
@@ -99,11 +125,11 @@ def list_case_studies(
 
 @router.get(
     "/admin/all",
-    response_model=list[dict],
+    response_model=dict,
     summary="List all case studies (admin)",
     description="Retrieve all case studies including unpublished ones. Admin access required.",
     responses={
-        200: {"description": "List of all case studies retrieved successfully"},
+        200: {"description": "List of all case studies retrieved successfully with pagination"},
     },
 )
 def list_all_case_studies(
@@ -111,7 +137,7 @@ def list_all_case_studies(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-) -> list[dict]:
+) -> dict:
     """List all case studies including unpublished (admin access).
     
     Args:
@@ -121,18 +147,44 @@ def list_all_case_studies(
         offset: Number of results to skip (default 0)
         
     Returns:
-        List of all case study objects (published and unpublished)
+        Dict with all case studies data and pagination metadata
         
     Raises:
         HTTPException: 500 if database operation fails
     """
     try:
         svc = get_content_db_service()
+        
+        # Get total count
+        total = svc.count_case_studies(
+            published_only=False, industry=industry, service=service
+        )
+        
+        # Get paginated data
         rows = svc.list_case_studies(
             published_only=False, industry=industry, service=service, limit=limit, offset=offset
         )
-        LOGGER.info(f"Admin retrieved {len(rows)} case studies (all statuses)")
-        return [_to_response(r) for r in rows]
+        
+        # Calculate pagination metadata
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+        has_next = offset + limit < total
+        has_previous = offset > 0
+        
+        LOGGER.info(f"Admin retrieved {len(rows)} of {total} case studies (page {current_page}/{total_pages})")
+        
+        return {
+            "data": [_to_response(r) for r in rows],
+            "pagination": {
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "currentPage": current_page,
+                "totalPages": total_pages,
+                "hasNext": has_next,
+                "hasPrevious": has_previous,
+            }
+        }
     except Exception as e:
         LOGGER.error(f"Error listing all case studies: {e}", exc_info=True)
         raise HTTPException(
