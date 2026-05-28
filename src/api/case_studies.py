@@ -1,6 +1,6 @@
-"""Case Studies API — New JSON-based schema.
+"""Case Studies API.
 
-Provides endpoints for managing case studies with JSON-based flexible schema.
+Provides endpoints for managing case studies.
 Includes public endpoints for frontend consumption and admin endpoints for management.
 """
 
@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 
-from src.models.schemas import CaseStudyNewCreate, CaseStudyNewUpdate
+from src.models.schemas import CaseStudyCreate, CaseStudyUpdate
 from src.services.content_db import get_content_db_service
 
 LOGGER = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def list_case_studies(
     """
     try:
         svc = get_content_db_service()
-        rows = svc.list_case_studies_new(
+        rows = svc.list_case_studies(
             published_only=True, industry=industry, service=service, limit=limit, offset=offset
         )
         LOGGER.info(f"Retrieved {len(rows)} case studies (industry={industry}, service={service})")
@@ -128,7 +128,7 @@ def list_all_case_studies(
     """
     try:
         svc = get_content_db_service()
-        rows = svc.list_case_studies_new(
+        rows = svc.list_case_studies(
             published_only=False, industry=industry, service=service, limit=limit, offset=offset
         )
         LOGGER.info(f"Admin retrieved {len(rows)} case studies (all statuses)")
@@ -164,7 +164,7 @@ def get_case_study_by_slug(slug: str) -> dict:
     """
     try:
         svc = get_content_db_service()
-        row = svc.get_case_study_by_slug_new(slug)
+        row = svc.get_case_study_by_slug(slug)
         
         if not row:
             LOGGER.info(f"Case study not found by slug: {slug}")
@@ -259,7 +259,7 @@ def get_case_study(page: str) -> dict:
         409: {"description": "Case study with this page ID already exists"},
     },
 )
-def create_case_study(payload: CaseStudyNewCreate) -> dict:
+def create_case_study(payload: CaseStudyCreate) -> dict:
     """Create a new case study.
     
     Args:
@@ -281,7 +281,7 @@ def create_case_study(payload: CaseStudyNewCreate) -> dict:
         if hasattr(data.get("meta"), "model_dump"):
             data["meta"] = data["meta"].model_dump(by_alias=False)
 
-        row = svc.create_case_study_new(data)
+        row = svc.create_case_study(data)
         LOGGER.info(f"Successfully created case study: {payload.page}")
         return _to_response(row)
         
@@ -316,7 +316,7 @@ def create_case_study(payload: CaseStudyNewCreate) -> dict:
         404: {"description": "Case study not found"},
     },
 )
-def update_case_study(page: str, payload: CaseStudyNewUpdate) -> dict:
+def update_case_study(page: str, payload: CaseStudyUpdate) -> dict:
     """Update an existing case study.
     
     Args:
@@ -346,7 +346,7 @@ def update_case_study(page: str, payload: CaseStudyNewUpdate) -> dict:
         if "meta" in data and hasattr(data["meta"], "model_dump"):
             data["meta"] = data["meta"].model_dump(by_alias=False)
 
-        row = svc.update_case_study_new(page, data)
+        row = svc.update_case_study(page, data)
         
         if not row:
             LOGGER.error(f"Update returned no result for page: {page}")
@@ -398,7 +398,7 @@ def delete_case_study(page: str) -> None:
     """
     try:
         svc = get_content_db_service()
-        deleted = svc.delete_case_study_new(page)
+        deleted = svc.delete_case_study(page)
         
         if not deleted:
             LOGGER.info(f"Case study not found for deletion: {page}")
@@ -445,10 +445,10 @@ def seed_case_studies_endpoint() -> dict:
         HTTPException: 500 if seeding fails
     """
     try:
-        from src.services.seed_data_new import seed_case_studies_new
+        from src.services.seed_data import seed_case_studies
         
         svc = get_content_db_service()
-        result = seed_case_studies_new(svc)
+        result = seed_case_studies(svc)
         
         if result.get('failed', 0) > 0:
             LOGGER.warning(f"Seeding completed with {result['failed']} failures")

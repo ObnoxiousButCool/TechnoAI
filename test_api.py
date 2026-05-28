@@ -5,7 +5,7 @@ import traceback
 
 # Test importing the module
 try:
-    from src.api.case_studies_new import list_case_studies
+    from src.api.case_studies import list_case_studies
     print("✓ Successfully imported list_case_studies")
 except Exception as e:
     print(f"✗ Error importing: {e}")

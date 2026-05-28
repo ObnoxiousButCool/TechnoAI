@@ -411,10 +411,10 @@ def seed_insights_endpoint() -> dict:
         HTTPException: 500 if seeding fails
     """
     try:
-        from src.services.seed_data_new import seed_insights_new
+        from src.services.seed_data import seed_insights
         
         svc = get_content_db_service()
-        result = seed_insights_new(svc)
+        result = seed_insights(svc)
         
         if result.get('error'):
             LOGGER.error(f"Seeding error: {result['error']}")

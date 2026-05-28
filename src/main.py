@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
-from src.api.case_studies_new import router as case_studies_new_router
+from src.api.case_studies import router as case_studies_router
 from src.api.chat import router as chat_router
 from src.api.ingest import router as ingest_router
 from src.api.insights import router as insights_router
@@ -75,7 +75,7 @@ def create_app() -> FastAPI:
 
     app.include_router(chat_router)
     app.include_router(ingest_router)
-    app.include_router(case_studies_new_router)
+    app.include_router(case_studies_router)
     app.include_router(insights_router)
 
     @app.get("/health", tags=["system"])

@@ -33,51 +33,8 @@ class ContentDBService:
 
     # ─── Schema initialization ─────────────────────────────────────────────────
 
-    def migrate_case_studies_table(self) -> None:
-        """Migrate existing case_studies table to case_studies_old."""
-
-        with self._connection() as conn:
-            with conn.cursor() as cur:
-                # Check if old table exists and new structure doesn't
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'case_studies'
-                    );
-                """)
-                case_studies_exists = cur.fetchone()["exists"]
-
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'case_studies_old'
-                    );
-                """)
-                case_studies_old_exists = cur.fetchone()["exists"]
-
-                # If case_studies exists and case_studies_old doesn't, rename it
-                if case_studies_exists and not case_studies_old_exists:
-                    LOGGER.info("Renaming case_studies table to case_studies_old...")
-                    cur.execute("ALTER TABLE case_studies RENAME TO case_studies_old;")
-                    
-                    # Rename indexes as well
-                    cur.execute("""
-                        ALTER INDEX IF EXISTS idx_case_studies_published 
-                        RENAME TO idx_case_studies_old_published;
-                    """)
-                    cur.execute("""
-                        ALTER INDEX IF EXISTS idx_case_studies_slug 
-                        RENAME TO idx_case_studies_old_slug;
-                    """)
-                    
-                    conn.commit()
-                    LOGGER.info("Successfully renamed case_studies to case_studies_old")
-
     def initialize(self) -> None:
         """Create required tables if they don't exist."""
-
-        # First, migrate the old case_studies table
-        self.migrate_case_studies_table()
 
         with self._connection() as conn:
             with conn.cursor() as cur:
@@ -190,9 +147,9 @@ class ContentDBService:
                 conn.commit()
         LOGGER.info("Content DB tables initialized.")
 
-    # ─── New Case Studies CRUD (JSON-based schema) ────────────────────────────
+    # ─── Case Studies CRUD ────────────────────────────
 
-    def list_case_studies_new(
+    def list_case_studies(
         self,
         published_only: bool = True,
         industry: Optional[str] = None,
@@ -200,7 +157,7 @@ class ContentDBService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict]:
-        """List case studies from new schema, optionally filtered."""
+        """List case studies, optionally filtered."""
 
         conditions = []
         params: list = []
@@ -236,24 +193,24 @@ class ContentDBService:
                 cur.execute("SELECT * FROM case_studies WHERE page = %s", [page])
                 return cur.fetchone()
 
-    def get_case_study_by_slug_new(self, slug: str) -> Optional[dict]:
-        """Get a single case study by slug from new schema."""
+    def get_case_study_by_slug(self, slug: str) -> Optional[dict]:
+        """Get a single case study by slug."""
 
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM case_studies WHERE slug = %s", [slug])
                 return cur.fetchone()
 
-    def get_case_study_new_by_id(self, case_study_id: int) -> Optional[dict]:
-        """Get a single case study by ID from new schema."""
+    def get_case_study_by_id(self, case_study_id: int) -> Optional[dict]:
+        """Get a single case study by ID."""
 
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM case_studies WHERE id = %s", [case_study_id])
                 return cur.fetchone()
 
-    def create_case_study_new(self, data: dict) -> dict:
-        """Insert a new case study with JSON-based schema. Returns the created record."""
+    def create_case_study(self, data: dict) -> dict:
+        """Insert a new case study. Returns the created record."""
 
         # Serialize JSONB fields
         if "meta" in data and not isinstance(data["meta"], str):
@@ -280,7 +237,7 @@ class ContentDBService:
                 conn.commit()
                 return result
 
-    def update_case_study_new(self, page: str, data: dict) -> Optional[dict]:
+    def update_case_study(self, page: str, data: dict) -> Optional[dict]:
         """Update an existing case study by page. Only updates provided fields."""
 
         data = {k: v for k, v in data.items() if v is not None}
@@ -311,7 +268,7 @@ class ContentDBService:
                 conn.commit()
                 return result
 
-    def delete_case_study_new(self, page: str) -> bool:
+    def delete_case_study(self, page: str) -> bool:
         """Delete a case study by page. Returns True if deleted."""
 
         with self._connection() as conn:
@@ -323,8 +280,8 @@ class ContentDBService:
                 conn.commit()
                 return result is not None
 
-    def upsert_case_study_new(self, data: dict) -> dict:
-        """Insert or update based on page (idempotent seed) for new schema."""
+    def upsert_case_study(self, data: dict) -> dict:
+        """Insert or update based on page (idempotent seed)."""
 
         defaults = {
             "version": 1,
@@ -373,7 +330,7 @@ class ContentDBService:
                 conn.commit()
                 return result
 
-    # ─── Insights CRUD (JSON-based schema) ────────────────────────────────────
+    # ─── Insights CRUD ────────────────────────────────────────────────────────
 
     def list_insights(
         self,

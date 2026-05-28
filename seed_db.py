@@ -1,16 +1,16 @@
 """Seed the new case studies table."""
 
 from src.services.content_db import get_content_db_service
-from src.services.seed_data_new import seed_case_studies_new
+from src.services.seed_data import seed_case_studies
 
 def main():
     print("Seeding case studies...")
     svc = get_content_db_service()
-    result = seed_case_studies_new(svc)
+    result = seed_case_studies(svc)
     print(f"Seeded {result['seeded']} out of {result['total']} case studies")
     
     print("\nVerifying data...")
-    rows = svc.list_case_studies_new(published_only=False, limit=10, offset=0)
+    rows = svc.list_case_studies(published_only=False, limit=10, offset=0)
     print(f"Found {len(rows)} case studies in database")
     for row in rows:
         print(f"  - Page: {row.get('page')}")

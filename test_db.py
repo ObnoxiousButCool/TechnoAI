@@ -5,9 +5,9 @@ from src.services.content_db import get_content_db_service
 def test_query():
     svc = get_content_db_service()
     
-    print("Testing list_case_studies_new...")
+    print("Testing list_case_studies...")
     try:
-        rows = svc.list_case_studies_new(published_only=False, limit=10, offset=0)
+        rows = svc.list_case_studies(published_only=False, limit=10, offset=0)
         print(f"Success! Found {len(rows)} rows")
         for row in rows:
             print(f"  - {row.get('page', 'N/A')}: {row.get('slug', 'N/A')}")

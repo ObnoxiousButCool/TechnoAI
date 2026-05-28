@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 import re
 
 
-# ─── New Case Study schemas (JSON-based section structure) ────────────────────
+# ─── Case Study schemas ────────────────────────────────────────────────────
 
 
 class CaseStudyMeta(BaseModel):
@@ -32,8 +32,8 @@ class CaseStudySection(BaseModel):
         extra = "allow"  # Allow additional fields not explicitly defined
 
 
-class CaseStudyNew(BaseModel):
-    """Case study with JSON-based flexible section structure."""
+class CaseStudy(BaseModel):
+    """Case study with flexible section structure."""
     
     page: str = Field(..., min_length=1, max_length=255, pattern=r"^[a-z0-9-]+$", description="Unique page identifier")
     slug: Optional[str] = Field(None, max_length=255, pattern=r"^[a-z0-9-]*$", description="URL-friendly slug")
@@ -57,11 +57,11 @@ class CaseStudyNew(BaseModel):
         return v
 
 
-class CaseStudyNewCreate(CaseStudyNew):
+class CaseStudyCreate(CaseStudy):
     pass
 
 
-class CaseStudyNewUpdate(BaseModel):
+class CaseStudyUpdate(BaseModel):
     """Partial update model for case studies."""
     
     slug: Optional[str] = Field(None, max_length=255, pattern=r"^[a-z0-9-]*$")
@@ -77,7 +77,7 @@ class CaseStudyNewUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class CaseStudyNewResponse(CaseStudyNew):
+class CaseStudyResponse(CaseStudy):
     """Case study response model with timestamps."""
     
     id: int = Field(..., description="Unique database identifier")

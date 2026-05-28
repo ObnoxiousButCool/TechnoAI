@@ -291,7 +291,7 @@ curl -X POST http://localhost:8000/ingest/run \
 - **Users API:** [src/api/users.py](src/api/users.py)
 - **Chat API:** [src/api/chat.py](src/api/chat.py)
 - **Ingest API:** [src/api/ingest.py](src/api/ingest.py)
-- **Case Studies API:** [src/api/case_studies_new.py](src/api/case_studies_new.py)
+- **Case Studies API:** [src/api/case_studies.py](src/api/case_studies.py)
 - **Main App:** [src/main.py](src/main.py)
 - **Schemas:** [src/models/schemas.py](src/models/schemas.py)
 - **User Service:** [src/services/user_service.py](src/services/user_service.py)
