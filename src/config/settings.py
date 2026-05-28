@@ -77,6 +77,16 @@ class Settings(BaseSettings):
         alias="GROQ_REWRITE_MODEL",
     )
 
+    # Environment mode: "dev" = Groq + Nomic, "prod" = Ollama
+    env_mode: str = Field(default="dev", alias="ENV_MODE")
+
+    # Nomic embeddings (for dev)
+    nomic_api_key: str = Field(default="", alias="NOMIC_API_KEY")
+    nomic_embedding_model: str = Field(
+        default="nomic-embed-text-v1.5",
+        alias="NOMIC_EMBEDDING_MODEL",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

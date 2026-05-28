@@ -33,27 +33,52 @@ def get_vector_store() -> VectorStore:
 
 
 def get_embedding_service() -> EmbeddingService:
-    """Build the embedding service."""
+    """Build the embedding service.
+
+    prod → Ollama (local nomic-embed-text)
+    dev  → Nomic Atlas API
+    """
 
     settings = get_settings()
-    return EmbeddingService(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_embedding_model,
-    )
+    if settings.env_mode == "prod":
+        return EmbeddingService(
+            provider="ollama",
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_embedding_model,
+        )
+    else:  # dev — Nomic Atlas
+        return EmbeddingService(
+            provider="nomic",
+            api_key=settings.nomic_api_key,
+            model=settings.nomic_embedding_model,
+        )
 
 
 def get_llm_service() -> LLMService:
-    """Build the LLM service."""
+    """Build the LLM service.
+
+    prod → Ollama (local model)
+    dev  → Groq
+    """
 
     settings = get_settings()
-    return LLMService(
-        groq_api_key=settings.groq_api_key,
-        answer_model=settings.groq_answer_model,
-        rewrite_model=settings.groq_rewrite_model,
-        temperature=settings.ollama_temperature,
-        top_p=settings.ollama_top_p,
-        num_predict=settings.ollama_num_predict,
-    )
+    if settings.env_mode == "prod":
+        return LLMService(
+            provider="ollama",
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            rewrite_model=settings.ollama_rewrite_model,
+            temperature=settings.ollama_temperature,
+            top_p=settings.ollama_top_p,
+            num_predict=settings.ollama_num_predict,
+        )
+    else:  # dev — Groq
+        return LLMService(
+            provider="groq",
+            api_key=settings.groq_api_key,
+            answer_model=settings.groq_answer_model,
+            rewrite_model=settings.groq_rewrite_model,
+        )
 
 
 def get_rag_service() -> RAGService:

@@ -68,28 +68,39 @@ better than a plausible-sounding fabrication.\
 
 
 class LLMService:
-    """Wrap Groq generation with strict grounding instructions."""
+    """Wrap LLM generation — Groq (dev) or Ollama (prod)."""
 
     def __init__(
         self,
-        groq_api_key: str,
-        answer_model: str,
+        provider: str,
         rewrite_model: str,
-        temperature: float,
-        top_p: float,
-        num_predict: int,
+        answer_model: str = "",
+        model: str = "",
+        api_key: str = "",
+        base_url: str = "",
+        temperature: float = 0.2,
+        top_p: float = 0.8,
+        num_predict: int = 180,
     ) -> None:
-        self._api_key = groq_api_key
-        self._answer_model = answer_model
+        self._provider = provider
+        # Groq uses answer_model; Ollama uses model — normalise to one field.
+        self._answer_model = answer_model or model
         self._rewrite_model = rewrite_model
         self._temperature = temperature
         self._top_p = top_p
         self._num_predict = num_predict
-        self._base_url = "https://api.groq.com/openai/v1"
-        self._headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
+
+        if provider == "groq":
+            self._base_url = "https://api.groq.com/openai/v1"
+            self._headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        else:  # ollama — OpenAI-compatible endpoint
+            self._base_url = f"{base_url}/v1"
+            self._headers = {
+                "Content-Type": "application/json",
+            }
 
     async def answer_question(
         self,
