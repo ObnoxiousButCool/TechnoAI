@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 
-from src.models.schemas import InsightCreate, InsightUpdate, InsightResponse
+from src.models.schemas import InsightCreate, InsightUpdate
 from src.services.content_db import get_content_db_service
 
 LOGGER = logging.getLogger(__name__)
@@ -225,7 +225,7 @@ def get_insight(page: str):
         409: {"description": "Insight with this page ID already exists"},
     },
 )
-def create_insight(payload: InsightCreate):
+def create_insight(payload: InsightCreate) -> dict:
     """Create a new insight.
     
     Args:
@@ -282,7 +282,7 @@ def create_insight(payload: InsightCreate):
         404: {"description": "Insight not found"},
     },
 )
-def update_insight(page: str, payload: InsightUpdate):
+def update_insight(page: str, payload: InsightUpdate) -> dict:
     """Update an existing insight.
     
     Args:
@@ -350,7 +350,7 @@ def update_insight(page: str, payload: InsightUpdate):
         404: {"description": "Insight not found"},
     },
 )
-def delete_insight(page: str):
+def delete_insight(page: str) -> None:
     """Delete an insight by page identifier.
     
     Args:
@@ -398,7 +398,7 @@ def delete_insight(page: str):
         500: {"description": "Seeding failed"},
     },
 )
-def seed_insights_endpoint():
+def seed_insights_endpoint() -> dict:
     """Seed insights from static JSON data.
     
     This operation is idempotent - safe to call multiple times.

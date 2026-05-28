@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import ValidationError
 
-from src.models.schemas import CaseStudyNewCreate, CaseStudyNewUpdate, CaseStudyNewResponse
+from src.models.schemas import CaseStudyNewCreate, CaseStudyNewUpdate
 from src.services.content_db import get_content_db_service
 
 LOGGER = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def list_case_studies(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-):
+) -> list[dict]:
     """List published case studies, ordered by creation date descending.
     
     Args:
@@ -111,7 +111,7 @@ def list_all_case_studies(
     service: Optional[str] = Query(None, max_length=100, description="Filter by service"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-):
+) -> list[dict]:
     """List all case studies including unpublished (admin access).
     
     Args:
@@ -150,7 +150,7 @@ def list_all_case_studies(
         404: {"description": "Case study not found or not published"},
     },
 )
-def get_case_study_by_slug(slug: str):
+def get_case_study_by_slug(slug: str) -> dict:
     """Get a single published case study by slug.
     
     Args:
@@ -202,7 +202,7 @@ def get_case_study_by_slug(slug: str):
         404: {"description": "Case study not found or not published"},
     },
 )
-def get_case_study(page: str):
+def get_case_study(page: str) -> dict:
     """Get a single published case study by page identifier.
     
     Args:
@@ -259,7 +259,7 @@ def get_case_study(page: str):
         409: {"description": "Case study with this page ID already exists"},
     },
 )
-def create_case_study(payload: CaseStudyNewCreate):
+def create_case_study(payload: CaseStudyNewCreate) -> dict:
     """Create a new case study.
     
     Args:
@@ -316,7 +316,7 @@ def create_case_study(payload: CaseStudyNewCreate):
         404: {"description": "Case study not found"},
     },
 )
-def update_case_study(page: str, payload: CaseStudyNewUpdate):
+def update_case_study(page: str, payload: CaseStudyNewUpdate) -> dict:
     """Update an existing case study.
     
     Args:
@@ -384,7 +384,7 @@ def update_case_study(page: str, payload: CaseStudyNewUpdate):
         404: {"description": "Case study not found"},
     },
 )
-def delete_case_study(page: str):
+def delete_case_study(page: str) -> None:
     """Delete a case study by page identifier.
     
     Args:
@@ -419,12 +419,6 @@ def delete_case_study(page: str):
             detail="Failed to delete case study"
         )
 
-    svc = get_content_db_service()
-    deleted = svc.delete_case_study_new(page)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Case study not found")
-    return None
-
 
 # ─── Seed endpoint ─────────────────────────────────────────────────────────────
 
@@ -438,7 +432,7 @@ def delete_case_study(page: str):
         500: {"description": "Seeding failed"},
     },
 )
-def seed_case_studies_endpoint():
+def seed_case_studies_endpoint() -> dict:
     """Seed case studies from static JSON data.
     
     This operation is idempotent - safe to call multiple times.
